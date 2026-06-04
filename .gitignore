@@ -1,0 +1,30 @@
+# Dependencies
+__pycache__/
+*.pyc
+node_modules/
+.pnpm-store/
+
+# Environment
+.env
+.venv/
+venv/
+
+# Data (runtime)
+data/*.db
+data/memory/*.json
+data/traces/*.json
+data/knowledge/wiki/
+
+# Build
+dist/
+target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
