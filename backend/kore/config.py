@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 
-class AgentConfig(BaseSettings):
+class AgentConfig(BaseModel):
     """Agent execution configuration."""
 
     chat_model: str = "deepseek-chat"
@@ -25,7 +25,7 @@ class AgentConfig(BaseSettings):
     llm_retry_delay: float = 1.0
 
 
-class LLMProviderConfig(BaseSettings):
+class LLMProviderConfig(BaseModel):
     """LLM provider API keys and endpoints."""
 
     openai_api_key: str = ""
@@ -37,7 +37,7 @@ class LLMProviderConfig(BaseSettings):
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 
-class ServerConfig(BaseSettings):
+class ServerConfig(BaseModel):
     """FastAPI server configuration."""
 
     host: str = "127.0.0.1"
@@ -60,7 +60,7 @@ class KoreConfig(BaseSettings):
         "并能记住与用户的交流历史。"
     )
 
-    model_config = {"env_file": ".env", "env_prefix": "KORE_"}
+    model_config = {"env_file": ".env", "env_prefix": "KORE_", "env_nested_delimiter": "__", "extra": "ignore"}
 
     def ensure_dirs(self) -> None:
         """Create necessary directories."""

@@ -275,6 +275,28 @@ LLM 生成 Plan [Step1, Step2, Step3]
 
 **Spec 文档**：`specs/agent-runtime.md`
 
+### 2026-06-04: Phase 2 — 模型切换与完整 API
+
+**完成内容**：
+- ModelState 全局状态 (`runtime/models.py`) — 运行时模型切换、Provider 列表
+- AgentCore 改造 (`runtime/agent_core.py`) — 从 ModelState 读取当前模型
+- 模型管理 API (`api/models.py`) — `/api/models/list`、`/api/models/switch`、`/api/models/providers`
+- 配置读写 API (`api/config.py`) — `/api/config/models` GET/PUT（API Key 脱敏显示）
+
+**新增端点**：
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/models/list` | 列出可用模型 + 当前模型 |
+| POST | `/api/models/switch` | 切换当前模型 |
+| GET | `/api/models/providers` | 列出 Provider 及配置状态 |
+| GET | `/api/config/models` | 获取模型配置（API Key 脱敏） |
+| PUT | `/api/config/models` | 更新模型配置 |
+
+**验证结果**：
+- 模型切换成功：`deepseek-chat` → `gpt-4o`
+- 配置更新成功：API Key 脱敏显示为 `sk-*********6789`
+- Provider 状态联动：配置后 `configured: true`
+
 ---
 
 ## 参考资料

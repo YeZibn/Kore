@@ -22,9 +22,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     config.ensure_dirs()
 
     from kore.runtime.agent_core import AgentCore
-    app.state.agent_core = AgentCore(config)
+    from kore.runtime.models import ModelState
 
-    logger.info("Kore starting on %s:%s", config.server.host, config.server.port)
+    model_state = ModelState(current_model=config.agent.chat_model)
+    app.state.model_state = model_state
+    app.state.config = config
+    app.state.agent_core = AgentCore(config, model_state=model_state)
+
+    logger.info("Kore starting on %s:%s, model=%s", config.server.host, config.server.port, model_state.current_model)
     yield
     logger.info("Kore shutdown complete")
 

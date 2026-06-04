@@ -10,7 +10,7 @@ from kore.config import KoreConfig
 from kore.llm.base import LLMProvider, ToolCall
 from kore.llm.factory import LLMFactory
 from kore.prompting.builder import PromptBuilder
-from kore.runtime.models import RunContext, RunMode, RunStatus
+from kore.runtime.models import ModelState, RunContext, RunMode, RunStatus
 from kore.tools.base import ToolResult
 from kore.tools.builtin_tools import get_builtin_tools
 from kore.tools.decorator import get_definition
@@ -23,8 +23,9 @@ logger = logging.getLogger(__name__)
 class AgentCore:
     """Main agent that runs the ReAct reasoning loop."""
 
-    def __init__(self, config: KoreConfig) -> None:
+    def __init__(self, config: KoreConfig, model_state: ModelState | None = None) -> None:
         self.config = config
+        self.model_state = model_state or ModelState(current_model=config.agent.chat_model)
         self.llm_factory = LLMFactory(config.llm)
         self.tool_registry = ToolRegistry()
         self.prompt_builder = PromptBuilder(config.system_prompt)
@@ -83,18 +84,19 @@ class AgentCore:
         # Get tool schemas
         tools = self.tool_registry.get_schemas() or None
 
-        # Get LLM provider
-        llm = self.llm_factory.create(self.config.agent.chat_model)
+        # Get LLM provider — use runtime model state
+        model = self.model_state.current_model
+        llm = self.llm_factory.create(model)
 
         # ReAct loop
         max_steps = self.config.agent.max_direct_steps
         for step in range(max_steps):
-            logger.debug("Run %s: step %d", ctx.run_id, step)
+            logger.debug("Run %s: step %d, model=%s", ctx.run_id, step, model)
 
             response = await llm.chat(
                 messages=messages,
                 tools=tools,
-                model=self.config.agent.chat_model,
+                model=model,
             )
 
             # Track usage
@@ -134,6 +136,6 @@ class AgentCore:
             "role": "user",
             "content": "请根据以上信息给出最终回复。",
         })
-        response = await llm.chat(messages=messages, model=self.config.agent.chat_model)
+        response = await llm.chat(messages=messages, model=model)
         ctx.total_tokens += response.usage.total_tokens
         return response.content

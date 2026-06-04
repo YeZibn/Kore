@@ -139,15 +139,61 @@ prompt = builder.build(
 
 ---
 
-## 5. API 层
+## 5. 模型切换
 
-### 端点
+### 全局状态
+
+在 `app.state` 上维护运行时模型状态，AgentCore 每次调用时读取：
+
+```python
+# app.state 上的模型状态
+class ModelState:
+    current_model: str          # 当前对话模型，如 "deepseek-chat"
+    providers: dict[str, dict]  # 已配置的 provider 信息
+```
+
+### 切换流程
+
+```
+POST /api/models/switch {"model": "gpt-4o"}
+  → app.state.model_state.current_model = "gpt-4o"
+  → 后续 AgentCore.run() 使用新模型
+```
+
+AgentCore 在 `_run_direct` 中从 `app.state` 读取当前模型：
+
+```python
+model = app.state.model_state.current_model  # 而非 config.agent.chat_model
+llm = self.llm_factory.create(model)
+response = await llm.chat(messages, tools=tools, model=model)
+```
+
+### Provider 列表
+
+系统支持的 provider 列表为静态配置：
+
+| Provider | 关键词匹配 | Base URL |
+|----------|-----------|----------|
+| DeepSeek | deepseek | api.deepseek.com/v1 |
+| OpenAI | gpt/o1/o3/o4 | api.openai.com/v1 |
+| Qwen | qwen | dashscope.aliyuncs.com |
+
+---
+
+## 6. API 层
+
+### 端点总览
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/health` | 健康检查 |
 | GET | `/api/status` | 系统状态 |
 | POST | `/api/chat/send` | 发送消息给 Agent |
+| GET | `/api/models/list` | 列出可用模型 |
+| POST | `/api/models/switch` | 切换当前模型 |
+| GET | `/api/models/providers` | 列出支持的 Provider |
+| GET | `/api/config/models` | 获取当前模型配置（API Key 状态） |
+| PUT | `/api/config/models` | 更新模型配置（API Key、Base URL） |
 
 ### Chat API
 
@@ -157,9 +203,49 @@ Request:  { "message": "用户消息", "session_id": "" }
 Response: { "reply": "Agent回复", "model": "deepseek-chat" }
 ```
 
+### 模型管理 API
+
+```
+GET /api/models/list
+Response: {
+  "current_model": "deepseek-chat",
+  "models": [
+    {"name": "deepseek-chat", "provider": "DeepSeek"},
+    {"name": "gpt-4o", "provider": "OpenAI"},
+    {"name": "qwen-plus", "provider": "Qwen"}
+  ]
+}
+
+POST /api/models/switch
+Request:  { "model": "gpt-4o" }
+Response: { "success": true, "current_model": "gpt-4o" }
+
+GET /api/models/providers
+Response: {
+  "providers": [
+    {"name": "DeepSeek", "base_url": "https://api.deepseek.com/v1", "configured": true},
+    {"name": "OpenAI", "base_url": "https://api.openai.com/v1", "configured": false},
+    {"name": "Qwen", "base_url": "...", "configured": false}
+  ]
+}
+
+GET /api/config/models
+Response: {
+  "providers": {
+    "deepseek": {"api_key": "sk-***masked", "base_url": "..."},
+    "openai": {"api_key": "", "base_url": "..."},
+    "qwen": {"api_key": "", "base_url": "..."}
+  }
+}
+
+PUT /api/config/models
+Request:  { "provider": "deepseek", "api_key": "sk-xxx", "base_url": "https://..." }
+Response: { "success": true }
+```
+
 ---
 
-## 6. 配置管理
+## 7. 配置管理
 
 ### 层级
 
@@ -179,10 +265,11 @@ KoreConfig (根配置)
 
 ---
 
-## 7. 待实现
+## 8. 待实现
 
+- [x] 模型切换与完整 API (2026-06-04)
 - [ ] Plan 模式（Router + 步骤规划 + 逐步执行）
-- [ ] Claude Provider
+- [ ] Claude Provider（后续独立演进）
 - [ ] 流式输出 (SSE)
 - [ ] 更多内置工具（file_ops, web_search, web_fetch, terminal）
 - [ ] MCP 协议集成
