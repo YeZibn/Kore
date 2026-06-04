@@ -254,6 +254,29 @@ LLM 生成 Plan [Step1, Step2, Step3]
 
 ---
 
+## 开发日志
+
+### 2026-06-04: Phase 1 — ReAct 推理框架最小实现
+
+**完成内容**：
+- 配置管理 (`config.py`) — KoreConfig + 子配置，支持 .env 加载
+- LLM 抽象层 (`llm/`) — LLMProvider 基类、OpenAIProvider、LLMFactory
+- 工具系统 (`tools/`) — ToolRegistry、@tool 装饰器、ToolExecutor、3 个内置工具
+- ReAct 推理循环 (`runtime/agent_core.py`) — Direct 模式 ReAct 循环
+- Prompt 管理 (`prompting/`) — 模板 + PromptBuilder
+- FastAPI 入口 + Chat API — `/health`、`/api/status`、`POST /api/chat/send`
+
+**验证结果**：
+- `/health` 返回 `{"status": "ok"}`
+- `/api/status` 返回 `{"status": "running"}`
+- 服务正常启动于 `http://127.0.0.1:9899`
+
+**环境**：使用 huolala Python 环境 (`/Users/yezibin/huolala/`)
+
+**Spec 文档**：`specs/agent-runtime.md`
+
+---
+
 ## 参考资料
 
 - [CowAgent](https://github.com/zhayujie/CowAgent) — 多渠道、技能系统、记忆架构参考
