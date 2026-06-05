@@ -319,6 +319,33 @@ LLM 生成 Plan [Step1, Step2, Step3]
 - 后续事项:
   - 如需长期运行服务，可补充启动脚本或固定后端运行环境说明
 
+### 2026-06-05: CLI — 面向用户的终端入口首版实现
+
+- 对应 spec: `specs/cli.md`
+- 完成内容:
+  - 新增 `kore` 命令入口和 `backend/kore/cli.py`
+  - 基于 `typer + httpx + rich` 实现用户型 CLI
+  - 支持 `kore` 聊天模式、`kore ask`、`kore status`
+  - 支持 `kore model list`、`kore model switch`
+  - 支持 `kore config show`、`kore config set`
+  - 实现后端健康检查与本地后端自动拉起
+  - 为自动拉起失败补充启动日志尾部回显
+- 关键决策:
+  - CLI 走本地 FastAPI，而不是直连 AgentCore
+  - 第一版优先做高质量 CLI，不扩展为复杂 TUI
+  - 聊天模式输出更详细上下文，但不展示内部推理和工具调用事件
+- 验证情况:
+  - 已通过 `py_compile` 校验 CLI 文件语法
+  - `python -m kore.cli --help` 正常显示命令结构
+  - `kore status` 可自动启动后端并展示当前模型与 provider 状态
+  - `kore model switch deepseek-chat` 执行成功
+  - `kore config show` 与 `kore config set --provider deepseek --base-url https://api.deepseek.com/v1` 执行成功
+  - `kore ask "请只回复 pong"` 返回 `pong`
+- 后续事项:
+  - 评估是否补充流式输出
+  - 评估是否在聊天模式加入更多斜杠命令
+  - 评估自动拉起后端的生命周期管理策略
+
 ---
 
 ## 参考资料

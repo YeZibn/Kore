@@ -1,10 +1,12 @@
 pyproject.toml
 kore/__init__.py
+kore/cli.py
 kore/config.py
 kore/main.py
 kore.egg-info/PKG-INFO
 kore.egg-info/SOURCES.txt
 kore.egg-info/dependency_links.txt
+kore.egg-info/entry_points.txt
 kore.egg-info/requires.txt
 kore.egg-info/top_level.txt
 kore/api/__init__.py
