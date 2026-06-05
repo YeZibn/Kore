@@ -13,6 +13,8 @@
 - `KoreConfig` 通过 `.env` 读取 provider API Key、base URL 和默认模型配置
 - `ModelState.current_model` 作为运行时当前模型状态保存在 `app.state`
 - DeepSeek 当前通过 `backend/.env` 提供本地配置
+- DeepSeek 官方当前主 API 模型为 `deepseek-v4-flash` 与 `deepseek-v4-pro`
+- `deepseek-chat` 与 `deepseek-reasoner` 仅为兼容别名，不再作为当前官方主模型展示
 
 ## 当前目标
 
@@ -35,6 +37,10 @@
 - 聊天接口返回值中的 `model` 字段改为反映真实运行时模型
 - 首个真实联通测试目标为 DeepSeek，并要求通过 `.env` 提供配置
 - 为匹配现有 `agent` conda 环境，本次将后端 Python 版本要求从 `>=3.12` 调整为兼容 `3.11`
+- DeepSeek 模型展示严格对齐官方当前主模型，只保留 `deepseek-v4-flash` 与 `deepseek-v4-pro`
+- 默认 DeepSeek 模型改为 `deepseek-v4-flash`
+- DeepSeek 的“思考 / 非思考”不再通过旧模型名区分，而是通过独立 `thinking` 开关控制
+- 第一版 `thinking` 仅对 DeepSeek 生效，不强行抽象为所有 provider 的统一布尔开关
 
 ## 设计方案
 
@@ -52,16 +58,29 @@
 - `POST /api/models/switch` 继续只负责切换 `ModelState.current_model`
 - 不要求本次将当前模型切换结果写回 `.env`
 - `POST /api/chat/send` 必须返回本次请求实际使用的运行时模型
+- DeepSeek 模型列表中不再展示 `deepseek-chat` 与 `deepseek-reasoner`
+- 运行时如仍传入历史别名，可视为兼容输入，但展示层与默认值不再使用旧名称
+
+### DeepSeek Thinking
+
+- 增加 DeepSeek 专属 `thinking` 配置开关
+- `thinking` 应作为调用参数传给 DeepSeek，而不是继续依赖旧模型名
+- 第一版优先支持全局配置：
+  - `.env`
+  - 配置 API
+  - CLI 配置命令
+- 第一版不为 OpenAI、Qwen 等 provider 复用同名布尔开关
 
 ### DeepSeek 验证
 
 - 使用 `backend/.env` 提供 `KORE_LLM__DEEPSEEK_API_KEY`
-- 默认模型可使用 `deepseek-chat`
+- 默认模型使用 `deepseek-v4-flash`
 - 验证链路至少包括：
   - 服务启动后可读取 DeepSeek 配置
   - `GET /api/models/providers` 能反映配置状态
   - `POST /api/models/switch` 能更新当前模型
   - `POST /api/chat/send` 在 DeepSeek 配置有效时返回成功响应
+  - `thinking` 开关打开和关闭时都能完成请求
 
 ## 关键接口 / 数据结构
 
@@ -71,12 +90,15 @@
 - `PUT /api/config/models`
 - `POST /api/models/switch`
 - `POST /api/chat/send`
+- `deepseek_thinking_enabled`
 
 ## 约束与取舍
 
 - 本次仅处理本地 `.env` 持久化，不引入更复杂的配置管理方案
 - 本次以 provider 配置持久化为主，不要求将运行时当前模型切换结果回写 `.env`
 - 本次为了优先完成真实联调，接受将项目后端运行时约束下调到 Python 3.11
+- 本次严格按官方当前 DeepSeek 模型更新展示层，不继续公开旧别名模型名
+- 本次仅为 DeepSeek 增加 `thinking` 开关，不提前抽象成跨 provider 通用能力
 - 若缺少真实 DeepSeek API Key，可以先完成代码闭环与本地非联网验证，再等待用户提供密钥执行真实调用
 
 ## 待确认事项
@@ -93,4 +115,9 @@
 - 已将后端 Python 版本约束调整为兼容 `agent` conda 环境的 Python 3.11
 - 已验证 `GET /api/models/providers` 正确显示 DeepSeek `configured: true`
 - 已验证 `POST /api/models/switch` 可将当前模型切换为 `gpt-4o`
-- 已验证在切回 `deepseek-chat` 后，`POST /api/chat/send` 返回 `200`，回复 `pong`，且返回模型为 `deepseek-chat`
+- 已将 DeepSeek 模型列表修正为官方当前主模型：`deepseek-v4-flash`、`deepseek-v4-pro`
+- 已将默认 DeepSeek 模型修正为 `deepseek-v4-flash`
+- 已为 DeepSeek 增加专属 `thinking` 全局配置开关，并接入 `.env`、配置 API 与 CLI
+- 已修正 OpenAI-compatible 调用层，将 DeepSeek `thinking` 通过 `extra_body` 透传
+- 已验证 `thinking off` 时 `POST /api/chat/send` 返回 `200`，回复 `pong`，模型为 `deepseek-v4-flash`
+- 已验证 `thinking on` 时 `POST /api/chat/send` 返回 `200`，回复 `pong`，模型为 `deepseek-v4-flash`

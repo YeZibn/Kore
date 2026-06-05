@@ -16,8 +16,8 @@ ENV_EXAMPLE_PATH = BACKEND_ROOT / ".env.example"
 class AgentConfig(BaseModel):
     """Agent execution configuration."""
 
-    chat_model: str = "deepseek-chat"
-    router_model: str = "deepseek-chat"
+    chat_model: str = "deepseek-v4-flash"
+    router_model: str = "deepseek-v4-flash"
     embedding_model: str = "text-embed-3-small"
     max_direct_steps: int = 10
     max_plan_steps: int = 6
@@ -38,6 +38,7 @@ class LLMProviderConfig(BaseModel):
     anthropic_api_key: str = ""
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com/v1"
+    deepseek_thinking_enabled: bool = False
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 

@@ -346,6 +346,44 @@ LLM 生成 Plan [Step1, Step2, Step3]
   - 评估是否在聊天模式加入更多斜杠命令
   - 评估自动拉起后端的生命周期管理策略
 
+### 2026-06-05: LLM config and switching — DeepSeek 官方模型修正与 thinking 开关
+
+- 对应 spec: `specs/llm-config-and-switching.md`
+- 完成内容:
+  - 将 DeepSeek 展示模型从旧别名 `deepseek-chat`、`deepseek-reasoner` 修正为官方当前主模型 `deepseek-v4-flash`、`deepseek-v4-pro`
+  - 将默认模型从 `deepseek-chat` 修正为 `deepseek-v4-flash`
+  - 新增 `deepseek_thinking_enabled` 配置项并写入 `.env`
+  - 将 DeepSeek `thinking` 通过 OpenAI-compatible SDK 的 `extra_body` 透传到请求体
+  - 扩展配置 API 和 CLI，使 `thinking` 可查看、可切换
+- 关键决策:
+  - 严格按官方当前模型展示，不再把兼容别名作为主模型暴露
+  - `thinking` 第一版仅为 DeepSeek 提供，不提前抽象成跨 provider 通用布尔开关
+  - `thinking` 作为独立开关控制，而不是继续用旧模型名区分思考与非思考
+- 验证情况:
+  - `GET /api/models/list` 返回 DeepSeek 模型为 `deepseek-v4-flash`、`deepseek-v4-pro`
+  - `GET /api/config/models` 返回 `deepseek.thinking_enabled`
+  - `kore config show` 正确展示 DeepSeek `thinking` 状态
+  - `kore config set --provider deepseek --no-thinking` 后，真实请求返回 `pong`
+  - `kore config set --provider deepseek --thinking` 后，真实请求返回 `pong`
+- 后续事项:
+  - 如需支持更多 provider 的 reasoning 能力，应设计更通用的能力抽象，而不是复用同名布尔开关
+
+### 2026-06-06: CLI — 聊天模式补充 thinking 命令
+
+- 对应 spec: `specs/cli.md`
+- 完成内容:
+  - 为聊天模式增加 `/thinking`
+  - 为聊天模式增加 `/thinking on`
+  - 为聊天模式增加 `/thinking off`
+  - 在聊天欢迎区显示当前 DeepSeek thinking 状态
+- 关键决策:
+  - REPL 内的 thinking 切换直接复用既有配置 API，不新增专用端点
+  - thinking 命令当前仅作用于 DeepSeek
+- 验证情况:
+  - 通过脚本化输入验证 `/thinking`、`/thinking on`、`/thinking off` 在聊天模式中可正常工作
+- 后续事项:
+  - 当前再次执行 `pip install -e backend` 暴露出 setuptools 自动发现 `kore`、`data`、`skills` 的打包问题，后续需要在 `pyproject.toml` 中显式约束包发现范围
+
 ---
 
 ## 参考资料

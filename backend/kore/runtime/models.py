@@ -43,7 +43,7 @@ SUPPORTED_PROVIDERS = [
         "name": "DeepSeek",
         "keywords": ["deepseek"],
         "default_base_url": "https://api.deepseek.com/v1",
-        "models": ["deepseek-chat", "deepseek-reasoner"],
+        "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
     },
     {
         "name": "OpenAI",
@@ -64,7 +64,7 @@ SUPPORTED_PROVIDERS = [
 class ModelState:
     """Global model state — runtime-switchable model configuration."""
 
-    current_model: str = "deepseek-chat"
+    current_model: str = "deepseek-v4-flash"
 
     def switch(self, model: str) -> None:
         """Switch the current model."""

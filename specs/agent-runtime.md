@@ -148,7 +148,7 @@ prompt = builder.build(
 ```python
 # app.state 上的模型状态
 class ModelState:
-    current_model: str          # 当前对话模型，如 "deepseek-chat"
+    current_model: str          # 当前对话模型，如 "deepseek-v4-flash"
     providers: dict[str, dict]  # 已配置的 provider 信息
 ```
 
@@ -200,7 +200,7 @@ response = await llm.chat(messages, tools=tools, model=model)
 ```
 POST /api/chat/send
 Request:  { "message": "用户消息", "session_id": "" }
-Response: { "reply": "Agent回复", "model": "deepseek-chat" }
+Response: { "reply": "Agent回复", "model": "deepseek-v4-flash" }
 ```
 
 ### 模型管理 API
@@ -208,9 +208,10 @@ Response: { "reply": "Agent回复", "model": "deepseek-chat" }
 ```
 GET /api/models/list
 Response: {
-  "current_model": "deepseek-chat",
+  "current_model": "deepseek-v4-flash",
   "models": [
-    {"name": "deepseek-chat", "provider": "DeepSeek"},
+    {"name": "deepseek-v4-flash", "provider": "DeepSeek"},
+    {"name": "deepseek-v4-pro", "provider": "DeepSeek"},
     {"name": "gpt-4o", "provider": "OpenAI"},
     {"name": "qwen-plus", "provider": "Qwen"}
   ]

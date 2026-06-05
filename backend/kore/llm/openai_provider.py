@@ -26,9 +26,16 @@ class OpenAIProvider(LLMProvider):
         model: str = "gpt-4o",
         **kwargs: Any,
     ) -> ChatResponse:
+        thinking = kwargs.pop("thinking", None)
+        extra_body = kwargs.pop("extra_body", None) or {}
+        if thinking is not None:
+            extra_body["thinking"] = {"type": thinking}
+
         params: dict[str, Any] = {"model": model, "messages": messages, **kwargs}
         if tools:
             params["tools"] = tools
+        if extra_body:
+            params["extra_body"] = extra_body
 
         response = await self.client.chat.completions.create(**params)
         choice = response.choices[0]
@@ -64,9 +71,16 @@ class OpenAIProvider(LLMProvider):
         model: str = "gpt-4o",
         **kwargs: Any,
     ) -> AsyncIterator[str]:
+        thinking = kwargs.pop("thinking", None)
+        extra_body = kwargs.pop("extra_body", None) or {}
+        if thinking is not None:
+            extra_body["thinking"] = {"type": thinking}
+
         params: dict[str, Any] = {"model": model, "messages": messages, "stream": True, **kwargs}
         if tools:
             params["tools"] = tools
+        if extra_body:
+            params["extra_body"] = extra_body
 
         stream = await self.client.chat.completions.create(**params)
         async for chunk in stream:

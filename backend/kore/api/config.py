@@ -17,6 +17,7 @@ config_router = APIRouter()
 class ProviderConfig(BaseModel):
     api_key: str = ""
     base_url: str = ""
+    thinking_enabled: bool | None = None
 
 
 class ProviderConfigResponse(BaseModel):
@@ -27,6 +28,7 @@ class UpdateProviderRequest(BaseModel):
     provider: str
     api_key: str = ""
     base_url: str = ""
+    thinking_enabled: bool | None = None
 
 
 class UpdateResponse(BaseModel):
@@ -47,17 +49,19 @@ async def get_model_config(request: Request) -> ProviderConfigResponse:
     providers = {}
 
     provider_map = {
-        "deepseek": ("deepseek_api_key", "deepseek_base_url"),
-        "openai": ("openai_api_key", "openai_base_url"),
-        "qwen": ("qwen_api_key", "qwen_base_url"),
+        "deepseek": ("deepseek_api_key", "deepseek_base_url", "deepseek_thinking_enabled"),
+        "openai": ("openai_api_key", "openai_base_url", None),
+        "qwen": ("qwen_api_key", "qwen_base_url", None),
     }
 
-    for name, (key_attr, url_attr) in provider_map.items():
+    for name, (key_attr, url_attr, thinking_attr) in provider_map.items():
         api_key = getattr(config.llm, key_attr, "")
         base_url = getattr(config.llm, url_attr, "")
+        thinking_enabled = getattr(config.llm, thinking_attr, None) if thinking_attr else None
         providers[name] = ProviderConfig(
             api_key=_mask_key(api_key),
             base_url=base_url,
+            thinking_enabled=thinking_enabled,
         )
 
     return ProviderConfigResponse(providers=providers)
@@ -69,15 +73,15 @@ async def update_model_config(request: Request, body: UpdateProviderRequest) -> 
     config = request.app.state.config
 
     provider_map = {
-        "deepseek": ("deepseek_api_key", "deepseek_base_url"),
-        "openai": ("openai_api_key", "openai_base_url"),
-        "qwen": ("qwen_api_key", "qwen_base_url"),
+        "deepseek": ("deepseek_api_key", "deepseek_base_url", "deepseek_thinking_enabled"),
+        "openai": ("openai_api_key", "openai_base_url", None),
+        "qwen": ("qwen_api_key", "qwen_base_url", None),
     }
 
     if body.provider not in provider_map:
         return UpdateResponse(success=False)
 
-    key_attr, url_attr = provider_map[body.provider]
+    key_attr, url_attr, thinking_attr = provider_map[body.provider]
     env_key = f"KORE_LLM__{body.provider.upper()}_API_KEY"
     env_base_url = f"KORE_LLM__{body.provider.upper()}_BASE_URL"
     env_updates: dict[str, str] = {}
@@ -91,6 +95,13 @@ async def update_model_config(request: Request, body: UpdateProviderRequest) -> 
         setattr(config.llm, url_attr, body.base_url)
         env_updates[env_base_url] = body.base_url
         logger.info("Updated base URL for provider: %s", body.provider)
+
+    if thinking_attr and body.thinking_enabled is not None:
+        setattr(config.llm, thinking_attr, body.thinking_enabled)
+        env_updates[f"KORE_LLM__{body.provider.upper()}_THINKING_ENABLED"] = (
+            "true" if body.thinking_enabled else "false"
+        )
+        logger.info("Updated thinking mode for provider: %s", body.provider)
 
     if env_updates:
         update_env_file(env_updates)

@@ -87,6 +87,11 @@ class AgentCore:
         # Get LLM provider — use runtime model state
         model = self.model_state.current_model
         llm = self.llm_factory.create(model)
+        llm_kwargs: dict[str, Any] = {}
+        if "deepseek" in model.lower():
+            llm_kwargs["thinking"] = (
+                "enabled" if self.config.llm.deepseek_thinking_enabled else "disabled"
+            )
 
         # ReAct loop
         max_steps = self.config.agent.max_direct_steps
@@ -97,6 +102,7 @@ class AgentCore:
                 messages=messages,
                 tools=tools,
                 model=model,
+                **llm_kwargs,
             )
 
             # Track usage
@@ -136,6 +142,6 @@ class AgentCore:
             "role": "user",
             "content": "请根据以上信息给出最终回复。",
         })
-        response = await llm.chat(messages=messages, model=model)
+        response = await llm.chat(messages=messages, model=model, **llm_kwargs)
         ctx.total_tokens += response.usage.total_tokens
         return response.content

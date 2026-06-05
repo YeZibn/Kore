@@ -95,6 +95,7 @@ User Terminal
 - 显示回复后保留输入提示
 - 支持基础退出命令，例如 `/exit`、`/quit`
 - 支持基础命令，例如 `/model`、`/status`
+- 支持基础配置命令，例如 `/thinking`、`/thinking on`、`/thinking off`
 
 #### 单次命令
 
@@ -177,7 +178,8 @@ CLI 需要：
 - 已实现后端健康检查、自动拉起与启动失败日志回显
 - 已完成真实命令验证：
   - `kore status` 可自动启动后端并显示状态
-  - `kore model switch deepseek-chat` 可成功切换模型
+  - `kore model switch deepseek-v4-flash` 可成功切换模型
   - `kore config show` 可显示脱敏配置
   - `kore config set --provider deepseek --base-url ...` 可成功写入
   - `kore ask "请只回复 pong"` 可成功返回 `pong`
+- 下一步补充聊天模式中的 `/thinking on`、`/thinking off`

@@ -205,9 +205,19 @@ def render_config(base_url: str) -> None:
     table.add_column("Provider", style="bold")
     table.add_column("API Key")
     table.add_column("Base URL", overflow="fold")
+    table.add_column("Thinking")
     for provider, cfg in data.get("providers", {}).items():
-        table.add_row(provider, cfg.get("api_key", ""), cfg.get("base_url", ""))
+        thinking = cfg.get("thinking_enabled")
+        thinking_text = "-" if thinking is None else ("on" if thinking else "off")
+        table.add_row(provider, cfg.get("api_key", ""), cfg.get("base_url", ""), thinking_text)
     console.print(table)
+
+
+def get_deepseek_thinking(base_url: str) -> str:
+    data = request_json("GET", "/api/config/models", base_url=base_url)
+    deepseek = data.get("providers", {}).get("deepseek", {})
+    thinking = deepseek.get("thinking_enabled")
+    return "on" if thinking else "off"
 
 
 def run_chat_loop(base_url: str) -> None:
@@ -219,8 +229,9 @@ def run_chat_loop(base_url: str) -> None:
     intro = Table(box=None, show_header=False, pad_edge=False)
     intro.add_row("backend", base_url)
     intro.add_row("model", current_model)
+    intro.add_row("thinking", get_deepseek_thinking(base_url))
     intro.add_row("session", session_id[:8])
-    intro.add_row("tips", "/status  /model  /help  /quit")
+    intro.add_row("tips", "/status  /model  /thinking  /help  /quit")
     console.print(Panel(intro, title="Kore", border_style="blue"))
 
     while True:
@@ -236,13 +247,41 @@ def run_chat_loop(base_url: str) -> None:
         if message in {"/exit", "/quit"}:
             break
         if message == "/help":
-            console.print("Commands: /status, /model, /model <name>, /quit")
+            console.print("Commands: /status, /model, /model <name>, /thinking, /thinking on, /thinking off, /quit")
             continue
         if message == "/status":
             render_status(base_url)
             continue
         if message == "/model":
             render_models(base_url)
+            continue
+        if message == "/thinking":
+            console.print(f"DeepSeek thinking: [bold]{get_deepseek_thinking(base_url)}[/]")
+            continue
+        if message in {"/thinking on", "/thinking off"}:
+            enabled = message.endswith("on")
+            try:
+                request_json(
+                    "PUT",
+                    "/api/config/models",
+                    base_url=base_url,
+                    json_body={
+                        "provider": "deepseek",
+                        "api_key": "",
+                        "base_url": "",
+                        "thinking_enabled": enabled,
+                    },
+                )
+            except BackendUnavailable as exc:
+                render_error(str(exc))
+                continue
+            console.print(
+                Panel(
+                    f"DeepSeek thinking: [bold]{'on' if enabled else 'off'}[/]",
+                    title="Thinking Updated",
+                    border_style="green",
+                )
+            )
             continue
         if message.startswith("/model "):
             model_name = message.split(" ", 1)[1].strip()
@@ -404,6 +443,11 @@ def config_set(
     provider: str = typer.Option(..., "--provider", help="Provider name: deepseek/openai/qwen."),
     api_key: str | None = typer.Option(None, "--api-key", help="API key to persist into backend/.env."),
     base_url_value: str | None = typer.Option(None, "--base-url", help="Provider base URL to persist."),
+    thinking_enabled: bool | None = typer.Option(
+        None,
+        "--thinking/--no-thinking",
+        help="Enable or disable provider thinking mode when supported.",
+    ),
     request_base_url: str = typer.Option(
         DEFAULT_BASE_URL,
         "--server",
@@ -412,8 +456,8 @@ def config_set(
     ),
 ) -> None:
     """Update provider configuration and persist it to backend/.env."""
-    if not api_key and not base_url_value:
-        render_error("Provide at least one of --api-key or --base-url.")
+    if not api_key and not base_url_value and thinking_enabled is None:
+        render_error("Provide at least one of --api-key, --base-url, or --thinking/--no-thinking.")
         raise typer.Exit(code=1)
 
     try:
@@ -425,6 +469,7 @@ def config_set(
                 "provider": provider,
                 "api_key": api_key or "",
                 "base_url": base_url_value or "",
+                "thinking_enabled": thinking_enabled,
             },
         )
     except BackendUnavailable as exc:
@@ -437,6 +482,8 @@ def config_set(
         updated.add_row("api key", "updated")
     if base_url_value:
         updated.add_row("base url", base_url_value)
+    if thinking_enabled is not None:
+        updated.add_row("thinking", "on" if thinking_enabled else "off")
     console.print(Panel(updated, title="Config Updated", border_style="green"))
 
 
