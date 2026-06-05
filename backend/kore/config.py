@@ -8,6 +8,11 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+ENV_FILE_PATH = BACKEND_ROOT / ".env"
+ENV_EXAMPLE_PATH = BACKEND_ROOT / ".env.example"
+
+
 class AgentConfig(BaseModel):
     """Agent execution configuration."""
 
@@ -60,7 +65,12 @@ class KoreConfig(BaseSettings):
         "并能记住与用户的交流历史。"
     )
 
-    model_config = {"env_file": ".env", "env_prefix": "KORE_", "env_nested_delimiter": "__", "extra": "ignore"}
+    model_config = {
+        "env_file": ENV_FILE_PATH,
+        "env_prefix": "KORE_",
+        "env_nested_delimiter": "__",
+        "extra": "ignore",
+    }
 
     def ensure_dirs(self) -> None:
         """Create necessary directories."""
@@ -74,3 +84,36 @@ class KoreConfig(BaseSettings):
 def load_config() -> KoreConfig:
     """Load configuration from environment and defaults."""
     return KoreConfig()
+
+
+def update_env_file(updates: dict[str, str], env_file: Path = ENV_FILE_PATH) -> None:
+    """Persist key=value updates to backend/.env while preserving unrelated lines."""
+    source_path = env_file
+    if source_path.exists():
+        lines = source_path.read_text(encoding="utf-8").splitlines()
+    elif ENV_EXAMPLE_PATH.exists():
+        lines = ENV_EXAMPLE_PATH.read_text(encoding="utf-8").splitlines()
+    else:
+        lines = []
+
+    pending = dict(updates)
+    new_lines: list[str] = []
+
+    for line in lines:
+        replaced = False
+        for key, value in list(pending.items()):
+            if line.startswith(f"{key}="):
+                new_lines.append(f"{key}={value}")
+                pending.pop(key)
+                replaced = True
+                break
+        if not replaced:
+            new_lines.append(line)
+
+    if pending:
+        if new_lines and new_lines[-1].strip():
+            new_lines.append("")
+        for key, value in pending.items():
+            new_lines.append(f"{key}={value}")
+
+    env_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")

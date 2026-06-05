@@ -9,6 +9,8 @@ kore.egg-info/requires.txt
 kore.egg-info/top_level.txt
 kore/api/__init__.py
 kore/api/chat.py
+kore/api/config.py
+kore/api/models.py
 kore/api/router.py
 kore/channels/__init__.py
 kore/knowledge/__init__.py

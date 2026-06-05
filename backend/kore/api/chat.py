@@ -35,7 +35,7 @@ async def chat_send(request: Request, body: ChatRequest) -> ChatResponse:
 
     try:
         reply = await agent.run(body.message, body.session_id)
-        return ChatResponse(reply=reply, model=agent.config.agent.chat_model)
+        return ChatResponse(reply=reply, model=agent.model_state.current_model)
     except Exception as e:
         logger.error("Chat error: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

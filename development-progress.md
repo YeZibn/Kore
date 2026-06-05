@@ -297,6 +297,28 @@ LLM 生成 Plan [Step1, Step2, Step3]
 - 配置更新成功：API Key 脱敏显示为 `sk-*********6789`
 - Provider 状态联动：配置后 `configured: true`
 
+### 2026-06-05: LLM config and switching — `.env` 持久化与返回模型修正
+
+- 对应 spec: `specs/llm-config-and-switching.md`
+- 完成内容:
+  - 将后端配置文件路径显式固定为 `backend/.env`
+  - 为 provider 配置更新增加 `.env` 持久化逻辑，保留原有运行时内存更新
+  - 修正 `POST /api/chat/send` 的 `model` 字段，改为返回运行时 `current_model`
+  - 将后端 Python 版本要求从 `>=3.12` 调整为 `>=3.11`，以匹配 `agent` conda 环境
+  - 写入 DeepSeek 本地配置并完成真实联调
+- 关键决策:
+  - 本次只将 provider 配置写回 `.env`，不把运行时模型切换结果持久化
+  - 缺少 `backend/.env` 时，持久化逻辑以 `.env.example` 为模板生成
+  - 为优先完成联调，接受当前后端运行时约束下调到 Python 3.11
+- 验证情况:
+  - 已通过 `py_compile` 完成改动文件语法校验
+  - 使用 `agent` conda 环境安装后端依赖成功
+  - `GET /api/models/providers` 返回 DeepSeek `configured: true`
+  - `POST /api/models/switch` 成功切换 `deepseek-chat -> gpt-4o`
+  - 真实 DeepSeek 调用成功：`POST /api/chat/send` 返回 `200`，响应 `{"reply":"pong","model":"deepseek-chat"}`
+- 后续事项:
+  - 如需长期运行服务，可补充启动脚本或固定后端运行环境说明
+
 ---
 
 ## 参考资料

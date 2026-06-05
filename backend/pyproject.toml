@@ -2,7 +2,7 @@
 name = "kore"
 version = "0.1.0"
 description = "Kore - Personal AI Assistant & Agent Runtime"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
@@ -27,7 +27,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py311"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

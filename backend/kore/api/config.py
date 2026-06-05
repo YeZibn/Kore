@@ -7,6 +7,8 @@ import logging
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from kore.config import update_env_file
+
 logger = logging.getLogger(__name__)
 
 config_router = APIRouter()
@@ -63,7 +65,7 @@ async def get_model_config(request: Request) -> ProviderConfigResponse:
 
 @config_router.put("/models", response_model=UpdateResponse)
 async def update_model_config(request: Request, body: UpdateProviderRequest) -> UpdateResponse:
-    """Update model configuration (API key and/or base URL) at runtime."""
+    """Update model configuration in memory and persist it to backend/.env."""
     config = request.app.state.config
 
     provider_map = {
@@ -76,14 +78,22 @@ async def update_model_config(request: Request, body: UpdateProviderRequest) -> 
         return UpdateResponse(success=False)
 
     key_attr, url_attr = provider_map[body.provider]
+    env_key = f"KORE_LLM__{body.provider.upper()}_API_KEY"
+    env_base_url = f"KORE_LLM__{body.provider.upper()}_BASE_URL"
+    env_updates: dict[str, str] = {}
 
     if body.api_key:
         setattr(config.llm, key_attr, body.api_key)
+        env_updates[env_key] = body.api_key
         logger.info("Updated API key for provider: %s", body.provider)
 
     if body.base_url:
         setattr(config.llm, url_attr, body.base_url)
+        env_updates[env_base_url] = body.base_url
         logger.info("Updated base URL for provider: %s", body.provider)
+
+    if env_updates:
+        update_env_file(env_updates)
 
     # Recreate LLM factory with updated config
     from kore.llm.factory import LLMFactory
