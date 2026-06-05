@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable
 
+from pydantic import BaseModel
+
 
 @dataclass
 class ToolDefinition:
@@ -15,6 +17,10 @@ class ToolDefinition:
     parameters: dict[str, Any]  # JSON Schema for parameters
     fn: Callable[..., Awaitable[Any]] | None = None
     category: str = "general"
+    args_model: type[BaseModel] | None = None
+    read_only: bool = False
+    destructive: bool = False
+    requires_confirmation: bool = False
 
     def to_openai_schema(self) -> dict[str, Any]:
         """Convert to OpenAI function calling schema."""
@@ -34,5 +40,7 @@ class ToolResult:
 
     call_id: str
     name: str
+    ok: bool
     output: str
-    is_error: bool = False
+    error_type: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)

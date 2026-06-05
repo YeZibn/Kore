@@ -92,11 +92,23 @@ ToolRegistry (注册中心)
 
 ToolExecutor (执行器)
   └── execute(tool_calls) → list[ToolResult]
-      └── 查找定义 → 解析参数 → 执行(含重试) → 返回结果
+      └── 查找定义 → 参数校验 → 执行 → 返回结构化结果
 
 @tool 装饰器 (简化注册)
-  └── 自动从函数签名生成 JSON Schema
+  └── 绑定 pydantic 参数模型并生成 JSON Schema
 ```
+
+### 当前共识
+
+- 工具参数定义统一使用 `pydantic` 参数模型，不再继续扩展基于函数签名的弱 schema 生成方式
+- `ToolDefinition` 需要补充基础元信息：
+  - `read_only`
+  - `destructive`
+  - `requires_confirmation`
+- `ToolExecutor` 在执行前统一完成参数解析与校验
+- 校验失败不再依赖工具函数内部兜底，而是返回结构化错误结果
+- `ToolResult` 改为结构化返回，不再只有字符串输出
+- 本轮不处理 timeout、trace、确认交互、权限系统
 
 ### 内置工具
 
@@ -106,11 +118,61 @@ ToolExecutor (执行器)
 | `calculate` | 计算数学表达式 | expression: str |
 | `echo` | 回显文本（测试用） | text: str |
 
+### 参数模型模式
+
+推荐的工具定义方式：
+
+```python
+class MyToolArgs(BaseModel):
+    text: str
+
+
+@tool(
+    name="my_tool",
+    description="描述",
+    args_model=MyToolArgs,
+    read_only=True,
+)
+async def my_tool(args: MyToolArgs) -> str:
+    return args.text
+```
+
+执行流程：
+
+```text
+LLM tool_call
+  -> ToolExecutor 查找 ToolDefinition
+  -> 解析 JSON arguments
+  -> 用 pydantic args_model 校验
+  -> 校验失败: 返回结构化 invalid_arguments
+  -> 校验成功: 执行工具函数
+  -> 返回结构化 ToolResult
+```
+
+### ToolResult 结构
+
+- `call_id`
+- `name`
+- `ok`
+- `output`
+- `error_type`
+- `metadata`
+
+第一版错误类型至少包括：
+
+- `not_found`
+- `invalid_arguments`
+- `execution_error`
+
 ### 工具注册流程
 
 ```python
-@tool(name="my_tool", description="描述")
-async def my_tool(param: str) -> str:
+class MyToolArgs(BaseModel):
+    param: str
+
+
+@tool(name="my_tool", description="描述", args_model=MyToolArgs)
+async def my_tool(args: MyToolArgs) -> str:
     return "result"
 
 # 注册

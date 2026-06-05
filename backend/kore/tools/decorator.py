@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import inspect
 from typing import Any, Callable, Awaitable
+
+from pydantic import BaseModel
 
 from kore.tools.base import ToolDefinition
 
@@ -11,43 +12,31 @@ from kore.tools.base import ToolDefinition
 def tool(
     name: str,
     description: str,
+    args_model: type[BaseModel] | None = None,
     category: str = "general",
+    read_only: bool = False,
+    destructive: bool = False,
+    requires_confirmation: bool = False,
 ) -> Callable:
     """Decorator to register an async function as a tool.
 
     Usage:
-        @tool(name="get_time", description="Get current time")
-        async def get_time() -> str:
+        class GetTimeArgs(BaseModel):
+            timezone: str | None = None
+
+        @tool(name="get_time", description="Get current time", args_model=GetTimeArgs)
+        async def get_time(args: GetTimeArgs) -> str:
             return datetime.now().isoformat()
     """
 
     def decorator(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
-        # Build JSON Schema from function signature
-        sig = inspect.signature(fn)
-        properties: dict[str, Any] = {}
-        required: list[str] = []
+        if args_model is not None and not issubclass(args_model, BaseModel):
+            raise TypeError("args_model must be a pydantic BaseModel subclass")
 
-        for param_name, param in sig.parameters.items():
-            param_type = "string"
-            annotation = param.annotation
-            if annotation is int:
-                param_type = "integer"
-            elif annotation is float:
-                param_type = "number"
-            elif annotation is bool:
-                param_type = "boolean"
-
-            properties[param_name] = {"type": param_type}
-
-            if param.default is inspect.Parameter.empty:
-                required.append(param_name)
-
-        parameters_schema: dict[str, Any] = {
+        parameters_schema = args_model.model_json_schema() if args_model is not None else {
             "type": "object",
-            "properties": properties,
+            "properties": {},
         }
-        if required:
-            parameters_schema["required"] = required
 
         definition = ToolDefinition(
             name=name,
@@ -55,6 +44,10 @@ def tool(
             parameters=parameters_schema,
             fn=fn,
             category=category,
+            args_model=args_model,
+            read_only=read_only,
+            destructive=destructive,
+            requires_confirmation=requires_confirmation,
         )
 
         # Attach definition to the function

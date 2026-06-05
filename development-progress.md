@@ -384,6 +384,27 @@ LLM 生成 Plan [Step1, Step2, Step3]
 - 后续事项:
   - 当前再次执行 `pip install -e backend` 暴露出 setuptools 自动发现 `kore`、`data`、`skills` 的打包问题，后续需要在 `pyproject.toml` 中显式约束包发现范围
 
+### 2026-06-06: Agent runtime — 工具系统基础设施第一轮升级
+
+- 对应 spec: `specs/agent-runtime.md`
+- 完成内容:
+  - 扩展 `ToolDefinition`，补充 `args_model`、`read_only`、`destructive`、`requires_confirmation`
+  - 将工具参数定义统一切换到 `pydantic` 参数模型
+  - 重写 `@tool` 装饰器，使其从 `args_model` 生成 JSON Schema
+  - 改造 `ToolExecutor`，在执行前统一完成 JSON 解析与参数校验
+  - 将 `ToolResult` 改为结构化返回：`ok`、`error_type`、`metadata`
+  - 将内置工具 `get_current_time`、`calculate`、`echo` 迁移到 `pydantic` 参数模型
+- 关键决策:
+  - 本轮不再继续扩展基于函数签名的弱 schema 生成路径
+  - 参数校验统一收敛到执行器，不再依赖工具函数内部自行兜底
+  - 本轮只做基础设施，不处理 timeout、trace、确认交互
+- 验证情况:
+  - 已通过 `py_compile` 校验工具系统改动文件
+  - 已验证工具 schema 可从 `pydantic` 模型正确生成
+  - 已验证 `echo` 在参数缺失时返回结构化 `invalid_arguments`
+- 后续事项:
+  - 基于这套基础设施继续补充只读核心工具，如 `list_dir`、`read_file`、`search_text`
+
 ---
 
 ## 参考资料

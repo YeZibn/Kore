@@ -6,6 +6,8 @@ import json
 import logging
 from typing import Any
 
+from pydantic import ValidationError
+
 from kore.llm.base import ToolCall
 from kore.tools.base import ToolResult
 from kore.tools.registry import ToolRegistry
@@ -36,34 +38,64 @@ class ToolExecutor:
             return ToolResult(
                 call_id=call.id,
                 name=call.name,
+                ok=False,
                 output=f"Error: tool '{call.name}' not found",
-                is_error=True,
+                error_type="not_found",
             )
 
         if definition.fn is None:
             return ToolResult(
                 call_id=call.id,
                 name=call.name,
+                ok=False,
                 output=f"Error: tool '{call.name}' has no implementation",
-                is_error=True,
+                error_type="execution_error",
             )
 
         # Parse arguments
         try:
             args = json.loads(call.arguments) if call.arguments else {}
         except json.JSONDecodeError:
-            args = {}
+            return ToolResult(
+                call_id=call.id,
+                name=call.name,
+                ok=False,
+                output="Error: invalid JSON arguments",
+                error_type="invalid_arguments",
+            )
+
+        validated_args: Any = args
+        if definition.args_model is not None:
+            try:
+                validated_args = definition.args_model.model_validate(args)
+            except ValidationError as exc:
+                return ToolResult(
+                    call_id=call.id,
+                    name=call.name,
+                    ok=False,
+                    output=f"Error: invalid arguments for tool '{call.name}': {exc}",
+                    error_type="invalid_arguments",
+                )
 
         # Execute with retry
         last_error = None
         for attempt in range(self.retry_count + 1):
             try:
-                result = await definition.fn(**args)
+                if definition.args_model is not None:
+                    result = await definition.fn(validated_args)
+                else:
+                    result = await definition.fn()
                 logger.debug("Tool %s executed successfully", call.name)
                 return ToolResult(
                     call_id=call.id,
                     name=call.name,
+                    ok=True,
                     output=str(result),
+                    metadata={
+                        "read_only": definition.read_only,
+                        "destructive": definition.destructive,
+                        "requires_confirmation": definition.requires_confirmation,
+                    },
                 )
             except Exception as e:
                 last_error = e
@@ -72,6 +104,12 @@ class ToolExecutor:
         return ToolResult(
             call_id=call.id,
             name=call.name,
+            ok=False,
             output=f"Error: tool '{call.name}' failed after {self.retry_count + 1} attempts: {last_error}",
-            is_error=True,
+            error_type="execution_error",
+            metadata={
+                "read_only": definition.read_only,
+                "destructive": definition.destructive,
+                "requires_confirmation": definition.requires_confirmation,
+            },
         )
