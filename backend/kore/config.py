@@ -25,7 +25,8 @@ class AgentConfig(BaseModel):
     context_max_tokens: int = 8000
     memory_top_k: int = 5
     knowledge_top_k: int = 3
-    tool_retry_count: int = 1
+    tool_retry_count: int = 0
+    tool_timeout_seconds: float | None = 30.0
     llm_retry_count: int = 2
     llm_retry_delay: float = 1.0
 

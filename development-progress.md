@@ -405,6 +405,30 @@ LLM 生成 Plan [Step1, Step2, Step3]
 - 后续事项:
   - 基于这套基础设施继续补充只读核心工具，如 `list_dir`、`read_file`、`search_text`
 
+### 2026-06-06: Agent runtime — 工具执行控制层
+
+- 对应 spec: `specs/agent-runtime.md`
+- 完成内容:
+  - 为 `ToolDefinition` 增加 `timeout_seconds` 与 `retry_count`
+  - 将全局工具默认重试次数调整为 `0`
+  - 为 `AgentConfig` 增加 `tool_timeout_seconds`
+  - 在 `ToolExecutor` 中实现 `requires_confirmation` 拦截，返回 `confirmation_required`
+  - 在 `ToolExecutor` 中实现工具级 timeout 控制，返回 `timeout`
+  - 在 `ToolExecutor` 中实现工具级 retry 控制
+  - 在 `ToolResult.metadata` 中补充 `attempt_count`、`duration_ms`、`timed_out`、`confirmation_required`
+- 关键决策:
+  - 默认不自动重试工具调用，避免副作用工具被重复执行
+  - `requires_confirmation=True` 的工具在当前阶段只拦截，不做真实用户确认交互
+  - 本轮只做执行控制与结果元数据，不做完整 trace 事件流
+- 验证情况:
+  - 已通过 `py_compile` 校验改动文件
+  - 已验证 confirmation 工具会返回 `confirmation_required` 且不会执行
+  - 已验证超时工具会返回 `timeout`
+  - 已验证工具级 `retry_count=1` 可在第一次失败后重试成功
+  - 已验证参数缺失仍返回结构化 `invalid_arguments`
+- 后续事项:
+  - 补充真正的只读文件工具后，可基于这些 metadata 接入 CLI 或 UI 展示
+
 ---
 
 ## 参考资料

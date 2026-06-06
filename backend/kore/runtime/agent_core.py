@@ -37,6 +37,7 @@ class AgentCore:
         self.tool_executor = ToolExecutor(
             self.tool_registry,
             retry_count=config.agent.tool_retry_count,
+            default_timeout_seconds=config.agent.tool_timeout_seconds,
         )
 
     def _register_builtin_tools(self) -> None:

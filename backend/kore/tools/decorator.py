@@ -17,6 +17,8 @@ def tool(
     read_only: bool = False,
     destructive: bool = False,
     requires_confirmation: bool = False,
+    timeout_seconds: float | None = None,
+    retry_count: int | None = None,
 ) -> Callable:
     """Decorator to register an async function as a tool.
 
@@ -48,6 +50,8 @@ def tool(
             read_only=read_only,
             destructive=destructive,
             requires_confirmation=requires_confirmation,
+            timeout_seconds=timeout_seconds,
+            retry_count=retry_count,
         )
 
         # Attach definition to the function

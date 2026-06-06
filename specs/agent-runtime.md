@@ -92,7 +92,7 @@ ToolRegistry (注册中心)
 
 ToolExecutor (执行器)
   └── execute(tool_calls) → list[ToolResult]
-      └── 查找定义 → 参数校验 → 执行 → 返回结构化结果
+      └── 查找定义 → 参数校验 → 确认拦截 → timeout/retry 执行 → 返回结构化结果
 
 @tool 装饰器 (简化注册)
   └── 绑定 pydantic 参数模型并生成 JSON Schema
@@ -108,7 +108,8 @@ ToolExecutor (执行器)
 - `ToolExecutor` 在执行前统一完成参数解析与校验
 - 校验失败不再依赖工具函数内部兜底，而是返回结构化错误结果
 - `ToolResult` 改为结构化返回，不再只有字符串输出
-- 本轮不处理 timeout、trace、确认交互、权限系统
+- 工具执行控制先支持 timeout、retry、requires_confirmation 拦截与基础 metadata
+- 本轮不处理真正的用户确认交互、完整 trace 事件流、权限系统
 
 ### 内置工具
 
@@ -132,6 +133,8 @@ class MyToolArgs(BaseModel):
     description="描述",
     args_model=MyToolArgs,
     read_only=True,
+    timeout_seconds=5.0,
+    retry_count=0,
 )
 async def my_tool(args: MyToolArgs) -> str:
     return args.text
@@ -145,7 +148,10 @@ LLM tool_call
   -> 解析 JSON arguments
   -> 用 pydantic args_model 校验
   -> 校验失败: 返回结构化 invalid_arguments
+  -> requires_confirmation: 返回结构化 confirmation_required
   -> 校验成功: 执行工具函数
+  -> timeout: 返回结构化 timeout
+  -> execution error: 按 retry_count 重试后返回 execution_error
   -> 返回结构化 ToolResult
 ```
 
@@ -158,10 +164,19 @@ LLM tool_call
 - `error_type`
 - `metadata`
 
+`metadata` 至少包含：
+
+- `attempt_count`
+- `duration_ms`
+- `timed_out`
+- `confirmation_required`
+
 第一版错误类型至少包括：
 
 - `not_found`
 - `invalid_arguments`
+- `confirmation_required`
+- `timeout`
 - `execution_error`
 
 ### 工具注册流程

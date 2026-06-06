@@ -21,6 +21,8 @@ class ToolDefinition:
     read_only: bool = False
     destructive: bool = False
     requires_confirmation: bool = False
+    timeout_seconds: float | None = None
+    retry_count: int | None = None
 
     def to_openai_schema(self) -> dict[str, Any]:
         """Convert to OpenAI function calling schema."""
