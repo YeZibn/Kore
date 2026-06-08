@@ -143,6 +143,12 @@ def request_json(
             return response.json()
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text.strip() or str(exc)
+        try:
+            payload = exc.response.json()
+            if isinstance(payload, dict) and payload.get("detail"):
+                detail = str(payload["detail"])
+        except ValueError:
+            pass
         raise BackendUnavailable(detail) from exc
     except httpx.HTTPError as exc:
         raise BackendUnavailable(str(exc)) from exc
@@ -213,6 +219,29 @@ def render_config(base_url: str) -> None:
     console.print(table)
 
 
+def render_workspace(base_url: str) -> None:
+    data = request_json("GET", "/api/config/workspace", base_url=base_url)
+    table = Table(box=box.SIMPLE, show_header=False)
+    table.add_row("path", data.get("workspace_root", ""))
+    table.add_row("exists", "yes" if data.get("exists") else "no")
+    table.add_row("directory", "yes" if data.get("is_directory") else "no")
+    console.print(Panel(table, title="Workspace", border_style="blue"))
+
+
+def update_workspace(base_url: str, workspace_root: str) -> None:
+    data = request_json(
+        "PUT",
+        "/api/config/workspace",
+        base_url=base_url,
+        json_body={"workspace_root": workspace_root},
+    )
+    table = Table(box=box.SIMPLE, show_header=False)
+    table.add_row("path", data.get("workspace_root", ""))
+    table.add_row("exists", "yes" if data.get("exists") else "no")
+    table.add_row("directory", "yes" if data.get("is_directory") else "no")
+    console.print(Panel(table, title="Workspace Updated", border_style="green"))
+
+
 def get_deepseek_thinking(base_url: str) -> str:
     data = request_json("GET", "/api/config/models", base_url=base_url)
     deepseek = data.get("providers", {}).get("deepseek", {})
@@ -230,8 +259,10 @@ def run_chat_loop(base_url: str) -> None:
     intro.add_row("backend", base_url)
     intro.add_row("model", current_model)
     intro.add_row("thinking", get_deepseek_thinking(base_url))
+    workspace = request_json("GET", "/api/config/workspace", base_url=base_url)
+    intro.add_row("workspace", workspace.get("workspace_root", "unknown"))
     intro.add_row("session", session_id[:8])
-    intro.add_row("tips", "/status  /model  /thinking  /help  /quit")
+    intro.add_row("tips", "/status  /model  /thinking  /workspace  /help  /quit")
     console.print(Panel(intro, title="Kore", border_style="blue"))
 
     while True:
@@ -247,7 +278,10 @@ def run_chat_loop(base_url: str) -> None:
         if message in {"/exit", "/quit"}:
             break
         if message == "/help":
-            console.print("Commands: /status, /model, /model <name>, /thinking, /thinking on, /thinking off, /quit")
+            console.print(
+                "Commands: /status, /model, /model <name>, /thinking, /thinking on, "
+                "/thinking off, /workspace, /workspace <path>, /quit"
+            )
             continue
         if message == "/status":
             render_status(base_url)
@@ -257,6 +291,22 @@ def run_chat_loop(base_url: str) -> None:
             continue
         if message == "/thinking":
             console.print(f"DeepSeek thinking: [bold]{get_deepseek_thinking(base_url)}[/]")
+            continue
+        if message == "/workspace":
+            try:
+                render_workspace(base_url)
+            except BackendUnavailable as exc:
+                render_error(str(exc))
+            continue
+        if message.startswith("/workspace "):
+            workspace_root = message.split(" ", 1)[1].strip()
+            if not workspace_root:
+                render_error("Provide a workspace path.")
+                continue
+            try:
+                update_workspace(base_url, workspace_root)
+            except BackendUnavailable as exc:
+                render_error(str(exc))
             continue
         if message in {"/thinking on", "/thinking off"}:
             enabled = message.endswith("on")

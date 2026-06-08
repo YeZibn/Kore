@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from kore.config import update_env_file
@@ -35,11 +36,30 @@ class UpdateResponse(BaseModel):
     success: bool
 
 
+class WorkspaceConfigResponse(BaseModel):
+    workspace_root: str
+    exists: bool
+    is_directory: bool
+
+
+class UpdateWorkspaceRequest(BaseModel):
+    workspace_root: str
+
+
 def _mask_key(key: str) -> str:
     """Mask API key for display, showing only first 3 and last 4 chars."""
     if len(key) <= 8:
         return "***" if key else ""
     return f"{key[:3]}{'*' * (len(key) - 7)}{key[-4:]}"
+
+
+def _workspace_response(workspace_root: Path) -> WorkspaceConfigResponse:
+    resolved = workspace_root.expanduser().resolve()
+    return WorkspaceConfigResponse(
+        workspace_root=str(resolved),
+        exists=resolved.exists(),
+        is_directory=resolved.is_dir(),
+    )
 
 
 @config_router.get("/models", response_model=ProviderConfigResponse)
@@ -111,3 +131,41 @@ async def update_model_config(request: Request, body: UpdateProviderRequest) -> 
     request.app.state.agent_core.llm_factory = LLMFactory(config.llm)
 
     return UpdateResponse(success=True)
+
+
+@config_router.get("/workspace", response_model=WorkspaceConfigResponse)
+async def get_workspace_config(request: Request) -> WorkspaceConfigResponse:
+    """Get current workspace sandbox configuration."""
+    config = request.app.state.config
+    return _workspace_response(config.workspace_root)
+
+
+@config_router.put("/workspace", response_model=WorkspaceConfigResponse)
+async def update_workspace_config(
+    request: Request,
+    body: UpdateWorkspaceRequest,
+) -> WorkspaceConfigResponse:
+    """Update workspace root in memory, persist it, and rebuild AgentCore."""
+    config = request.app.state.config
+    if not body.workspace_root.strip():
+        raise HTTPException(status_code=400, detail="Workspace path is required.")
+
+    workspace_root = Path(body.workspace_root).expanduser().resolve()
+
+    if not workspace_root.exists():
+        raise HTTPException(status_code=400, detail="Workspace path does not exist.")
+    if not workspace_root.is_dir():
+        raise HTTPException(status_code=400, detail="Workspace path is not a directory.")
+
+    config.workspace_root = workspace_root
+    update_env_file({"KORE_WORKSPACE_ROOT": str(workspace_root)})
+
+    from kore.runtime.agent_core import AgentCore
+
+    request.app.state.agent_core = AgentCore(
+        config,
+        model_state=request.app.state.model_state,
+    )
+    logger.info("Updated workspace root: %s", workspace_root)
+
+    return _workspace_response(workspace_root)

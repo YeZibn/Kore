@@ -429,6 +429,96 @@ LLM 生成 Plan [Step1, Step2, Step3]
 - 后续事项:
   - 补充真正的只读文件工具后，可基于这些 metadata 接入 CLI 或 UI 展示
 
+### 2026-06-06: Specs — 模块整理与索引建立
+
+- 对应 spec: `specs/README.md`、`specs/agent-runtime.md`
+- 完成内容:
+  - 为 `specs/` 建立统一索引 `specs/README.md`
+  - 将规格整理为 6 个核心模块：
+    - `agent-runtime.md`
+    - `cli.md`
+    - `chat-ui.md`
+    - `memory-system.md`
+    - `knowledge-system.md`
+    - `skills-system.md`
+  - 将 `llm-config-and-switching.md` 的职责并回 `agent-runtime.md`
+  - 在 `agent-runtime.md` 中补入模型配置、DeepSeek thinking 与文件工具第一层边界的归属说明
+  - 更新 `spec-driven-coding` skill，要求先查索引、再写 spec、再更新索引
+- 关键决策:
+  - specs 按核心模块组织，不继续让配置或单一功能主题长期单列成零散 md
+  - `specs/README.md` 作为规格入口和归属判断依据
+- 验证情况:
+  - 当前 `specs` 目录已从 3 个零散文件整理为索引 + 核心模块结构
+- 后续事项:
+  - 后续新增 `chat-ui.md`、`memory-system.md`、`knowledge-system.md`、`skills-system.md` 时应按索引规则落盘
+
+### 2026-06-08: Specs — 按 Agent 组成部件二次细分
+
+- 对应 spec: `specs/README.md`
+- 完成内容:
+  - 将 specs 从 6 个粗模块调整为 12 个更贴近 Agent 组成部件的模块
+  - 新增并索引 `runtime-core.md`、`planner.md`、`react-loop.md`、`llm-system.md`、`tool-system.md`、`prompt-system.md`、`memory-system.md`、`knowledge-system.md`、`skills-system.md`、`channel-interfaces.md`、`api-surface.md`、`safety-and-policy.md`
+  - 将 `agent-runtime.md` 调整为历史聚合和跳转文档，不再作为新任务首选归属
+  - 将 CLI 第一版详细内容保留在 `cli.md`，但后续入口类任务统一归属 `channel-interfaces.md`
+  - 将 API、LLM 配置、工具边界、安全策略等残留内容迁移到对应细分模块
+- 关键决策:
+  - specs 以 Agent 组成部件划分，而不是以单次任务或过粗系统块划分
+  - `specs/README.md` 作为写入前的归属判断入口，模块 spec 更新后必须同步更新索引摘要
+  - 旧文档先作为历史详细文档保留，避免重整过程中丢失上下文
+- 验证情况:
+  - 已确认 `specs/README.md` 存在并列出当前模块
+  - 已核对 `agent-runtime.md`、`cli.md` 与新模块之间的归属关系
+- 后续事项:
+  - 继续沙箱开发时，应同步更新 `tool-system.md` 与 `safety-and-policy.md`
+
+### 2026-06-08: Tool system — workspace_root 文件沙箱第一层
+
+- 对应 spec: `specs/tool-system.md`、`specs/safety-and-policy.md`
+- 完成内容:
+  - 为配置新增 `KORE_WORKSPACE_ROOT`，并将当前项目路径写入 `backend/.env`
+  - 新增 `FileSandbox`，统一完成用户路径解析、绝对路径规范化与 workspace 内外判断
+  - 新增 workspace 外访问的 `ConfirmationRequiredError`
+  - 在 `ToolExecutor` 中捕获 workspace 外访问并返回结构化 `confirmation_required`
+  - 新增只读文件工具 `list_dir`、`read_file`、`search_text`
+  - 将内置文件工具注册到 `AgentCore`
+- 关键决策:
+  - 第一层只处理文件系统空间边界，不做 denylist
+  - workspace 外访问不直接执行，先返回 confirmation，不永久放宽边界
+  - 文件工具第一版只做只读能力，写入工具等后续再接入同一套沙箱
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已验证项目内路径通过 `FileSandbox`
+  - 已验证 `/etc/hosts` 被识别为 workspace 外
+  - 已验证 `read_file` 读取 workspace 内文件成功
+  - 已验证 `read_file` 访问 workspace 外文件返回 `confirmation_required`
+- 后续事项:
+  - 实现 CLI / UI 收到 `confirmation_required` 后向用户确认，并在用户同意后只执行本次调用
+  - 根据后续需要补充写入工具和更完整的输出裁剪策略
+
+### 2026-06-08: Channel interfaces — REPL workspace 配置入口
+
+- 对应 spec: `specs/api-surface.md`、`specs/channel-interfaces.md`、`specs/safety-and-policy.md`
+- 完成内容:
+  - 新增 `GET /api/config/workspace`，用于查看当前 workspace sandbox 配置
+  - 新增 `PUT /api/config/workspace`，用于更新当前 workspace
+  - 后端更新 workspace 时校验路径存在且为目录
+  - 成功更新后写入 `KORE_WORKSPACE_ROOT`，更新当前 runtime config，并重建 `AgentCore`
+  - 在 `kore` 聊天 REPL 中新增 `/workspace`
+  - 在 `kore` 聊天 REPL 中新增 `/workspace <path>`
+  - REPL 欢迎区新增当前 workspace 展示
+- 关键决策:
+  - workspace 第一版只做 REPL 内部命令，不新增外部 `kore workspace` 命令
+  - CLI 不直接写 `.env`，所有 workspace 修改都通过后端 API
+  - 修改 workspace 只影响后续工具调用，不重放历史调用
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过 FastAPI TestClient 验证 workspace GET、有效 PUT、无效路径 400
+  - 已通过脚本化 REPL 验证 `/workspace`
+  - 已通过脚本化 REPL 验证 `/workspace /Users/yezibin/Project/Kore`
+  - 已通过脚本化 REPL 验证无效路径错误展示
+- 后续事项:
+  - 继续实现工具调用 `confirmation_required` 后的用户确认与同次调用继续执行流程
+
 ---
 
 ## 参考资料

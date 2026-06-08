@@ -55,6 +55,7 @@ class ServerConfig(BaseModel):
 class KoreConfig(BaseSettings):
     """Root configuration for Kore."""
 
+    workspace_root: Path = Field(default_factory=Path.cwd)
     data_dir: Path = Field(default_factory=lambda: Path("data"))
     skills_dir: Path = Field(default_factory=lambda: Path("skills"))
     agent: AgentConfig = Field(default_factory=AgentConfig)
@@ -76,6 +77,7 @@ class KoreConfig(BaseSettings):
 
     def ensure_dirs(self) -> None:
         """Create necessary directories."""
+        self.workspace_root = self.workspace_root.expanduser().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         (self.data_dir / "memory").mkdir(exist_ok=True)
         (self.data_dir / "knowledge").mkdir(exist_ok=True)

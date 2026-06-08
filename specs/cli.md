@@ -1,6 +1,6 @@
 # CLI
 
-> 面向用户的 Kore 命令行入口，参考 Claude Code 风格，走本地 FastAPI
+> 历史详细文档。CLI 当前归属 `channel-interfaces.md`，新任务优先更新 `channel-interfaces.md`。
 
 ---
 

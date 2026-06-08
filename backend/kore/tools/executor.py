@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from kore.llm.base import ToolCall
 from kore.tools.base import ToolResult
 from kore.tools.registry import ToolRegistry
+from kore.tools.sandbox import ConfirmationRequiredError
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,25 @@ class ToolExecutor:
             except TimeoutError as e:
                 last_error = e
                 logger.warning("Tool %s timed out (attempt %d)", call.name, attempt + 1)
+            except ConfirmationRequiredError as e:
+                check = e.check
+                return ToolResult(
+                    call_id=call.id,
+                    name=call.name,
+                    ok=False,
+                    output=str(e),
+                    error_type="confirmation_required",
+                    metadata=self._metadata(
+                        started_at,
+                        attempt_count=attempt_count,
+                        confirmation_required=True,
+                        requested_path=check.requested_path,
+                        resolved_path=str(check.resolved_path),
+                        workspace_root=str(check.workspace_root),
+                        inside_workspace=check.inside_workspace,
+                        **base_metadata,
+                    ),
+                )
             except Exception as e:
                 last_error = e
                 logger.warning("Tool %s failed (attempt %d): %s", call.name, attempt + 1, e)

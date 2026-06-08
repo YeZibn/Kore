@@ -42,7 +42,7 @@ class AgentCore:
 
     def _register_builtin_tools(self) -> None:
         """Register all built-in tools."""
-        for tool_fn in get_builtin_tools():
+        for tool_fn in get_builtin_tools(self.config.workspace_root):
             definition = get_definition(tool_fn)
             self.tool_registry.register(definition)
 
