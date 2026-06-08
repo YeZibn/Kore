@@ -519,6 +519,51 @@ LLM 生成 Plan [Step1, Step2, Step3]
 - 后续事项:
   - 继续实现工具调用 `confirmation_required` 后的用户确认与同次调用继续执行流程
 
+### 2026-06-08: LLM system — 可用模型过滤与切换校验
+
+- 对应 spec: `specs/llm-system.md`、`specs/api-surface.md`、`specs/channel-interfaces.md`
+- 完成内容:
+  - 为 provider 模型配置增加 `active` 标记
+  - 模型列表只返回当前正式接入的 DeepSeek 模型
+  - OpenAI、Qwen 等未正式接入验证的模型不再显示在 CLI 模型列表中
+  - 模型切换前校验目标模型是否在可用模型列表中
+  - `POST /api/models/switch` 对不可用模型返回 400
+  - REPL `/model <name>` 捕获切换错误并展示错误面板，不退出聊天模式
+- 关键决策:
+  - 当前正式可用模型只保留 `deepseek-v4-flash` 与 `deepseek-v4-pro`
+  - 未正式接入验证的 provider 可继续保留配置能力，但不进入可切换模型列表
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过 FastAPI TestClient 验证 `/api/models/list` 只返回 DeepSeek 模型
+  - 已验证切换 `deepseek-v4-pro` 成功
+  - 已验证切换 `gpt-4o` 返回 400
+  - 已通过脚本化 REPL 验证 `/model` 只展示 DeepSeek 模型
+  - 已通过脚本化 REPL 验证 `/model gpt-4o` 展示错误并继续运行
+- 后续事项:
+  - 后续 OpenAI、Qwen 等 provider 完成正式接入和验证后，再将对应 provider 标为 active
+
+### 2026-06-08: Channel interfaces — REPL 后端关闭命令
+
+- 对应 spec: `specs/api-surface.md`、`specs/channel-interfaces.md`、`specs/runtime-core.md`
+- 完成内容:
+  - 新增 `POST /api/server/shutdown`
+  - 新增 REPL 内部命令 `/shutdown`
+  - 新增 REPL 内部命令 `/server stop` 作为 `/shutdown` 等价别名
+  - `/shutdown` 成功请求后显示关闭提示并退出当前 REPL
+  - 后端在返回成功响应后通过 SIGTERM 结束当前 uvicorn 进程
+- 关键决策:
+  - `/quit`、`/exit` 仍只退出聊天，不关闭后端
+  - 关闭后端必须通过显式 `/shutdown` 或 `/server stop`
+  - 第一版只做本地 CLI 使用，不扩展成远程服务器管理能力
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已确认 `/api/server/shutdown` 路由注册成功
+  - 已通过临时端口验证 `/shutdown` 能关闭后端，端口无残留
+  - 已通过临时端口验证 `/server stop` 能关闭后端，端口无残留
+  - 已关闭改动前遗留在 `9899` 上的旧后端进程，避免继续连到旧代码
+- 后续事项:
+  - 后续可考虑在 CLI 增加更明确的后端生命周期状态展示
+
 ---
 
 ## 参考资料

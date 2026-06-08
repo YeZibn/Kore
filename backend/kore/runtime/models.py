@@ -44,18 +44,21 @@ SUPPORTED_PROVIDERS = [
         "keywords": ["deepseek"],
         "default_base_url": "https://api.deepseek.com/v1",
         "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
+        "active": True,
     },
     {
         "name": "OpenAI",
         "keywords": ["gpt", "o1", "o3", "o4"],
         "default_base_url": "https://api.openai.com/v1",
         "models": ["gpt-4o", "gpt-4o-mini", "o3-mini"],
+        "active": False,
     },
     {
         "name": "Qwen",
         "keywords": ["qwen"],
         "default_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "models": ["qwen-plus", "qwen-turbo", "qwen-max"],
+        "active": False,
     },
 ]
 
@@ -68,7 +71,13 @@ class ModelState:
 
     def switch(self, model: str) -> None:
         """Switch the current model."""
+        if not self.is_available_model(model):
+            raise ValueError(f"Model '{model}' is not available.")
         self.current_model = model
+
+    def is_available_model(self, model: str) -> bool:
+        """Return whether a model is currently available for switching."""
+        return model in {item["name"] for item in self.list_models()}
 
     def get_provider_for_model(self, model: str) -> str:
         """Get the provider name for a given model."""
@@ -83,6 +92,8 @@ class ModelState:
         """List all available models across providers."""
         models = []
         for provider in SUPPORTED_PROVIDERS:
+            if not provider.get("active", False):
+                continue
             for model_name in provider["models"]:
                 models.append({"name": model_name, "provider": provider["name"]})
         return models

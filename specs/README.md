@@ -18,7 +18,7 @@
 - 运行期上下文结构
 
 当前概况：
-- 已从旧聚合文档中拆出为独立归属，后续继续细化 runtime 状态模型
+- 已从旧聚合文档中拆出为独立归属，已补充后端优雅关闭入口，后续继续细化 runtime 状态模型
 
 ## 2. planner.md
 
@@ -65,7 +65,7 @@
 - reasoning / thinking 能力映射
 
 当前概况：
-- 已具备 OpenAI-compatible 抽象、DeepSeek 官方模型展示修正与 thinking 配置
+- 已具备 OpenAI-compatible 抽象、DeepSeek 官方模型展示修正、thinking 配置、可用模型过滤和无效模型切换校验
 
 ## 5. tool-system.md
 
@@ -159,8 +159,9 @@
 - 多渠道接入策略
 
 当前概况：
-- CLI 已有第一版实现
+- CLI 已有第一版实现，已修正模型列表过滤和无效模型切换错误展示
 - REPL 内部 workspace 命令已实现
+- REPL shutdown 命令已实现
 - Chat UI 仍未实质开始
 
 ## 11. api-surface.md
@@ -176,7 +177,7 @@
 - 客户端与后端边界
 
 当前概况：
-- 已有最小 REST API，workspace config API 已实现
+- 已有最小 REST API，workspace config API、模型切换校验与 shutdown API 已实现
 
 ## 12. safety-and-policy.md
 

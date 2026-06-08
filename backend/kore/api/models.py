@@ -54,7 +54,10 @@ async def list_models(request: Request) -> ModelListResponse:
 async def switch_model(request: Request, body: SwitchRequest) -> SwitchResponse:
     """Switch the current model."""
     model_state = request.app.state.model_state
-    model_state.switch(body.model)
+    try:
+        model_state.switch(body.model)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return SwitchResponse(success=True, current_model=model_state.current_model)
 
 

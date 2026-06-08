@@ -6,4 +6,5 @@
 
 ## 当前状态
 
-- 待从旧 `agent-runtime.md` 中进一步拆分归位
+- 已有 FastAPI lifespan 启动与关闭钩子
+- 已补充 CLI 请求后端优雅关闭能力

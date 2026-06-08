@@ -242,6 +242,12 @@ def update_workspace(base_url: str, workspace_root: str) -> None:
     console.print(Panel(table, title="Workspace Updated", border_style="green"))
 
 
+def shutdown_backend(base_url: str) -> None:
+    data = request_json("POST", "/api/server/shutdown", base_url=base_url)
+    message = data.get("message", "Server shutdown requested.")
+    console.print(Panel(message, title="Shutdown", border_style="yellow"))
+
+
 def get_deepseek_thinking(base_url: str) -> str:
     data = request_json("GET", "/api/config/models", base_url=base_url)
     deepseek = data.get("providers", {}).get("deepseek", {})
@@ -262,7 +268,10 @@ def run_chat_loop(base_url: str) -> None:
     workspace = request_json("GET", "/api/config/workspace", base_url=base_url)
     intro.add_row("workspace", workspace.get("workspace_root", "unknown"))
     intro.add_row("session", session_id[:8])
-    intro.add_row("tips", "/status  /model  /thinking  /workspace  /help  /quit")
+    intro.add_row(
+        "tips",
+        "/status  /model  /thinking  /workspace  /shutdown  /help  /quit",
+    )
     console.print(Panel(intro, title="Kore", border_style="blue"))
 
     while True:
@@ -280,7 +289,8 @@ def run_chat_loop(base_url: str) -> None:
         if message == "/help":
             console.print(
                 "Commands: /status, /model, /model <name>, /thinking, /thinking on, "
-                "/thinking off, /workspace, /workspace <path>, /quit"
+                "/thinking off, /workspace, /workspace <path>, /shutdown, "
+                "/server stop, /quit"
             )
             continue
         if message == "/status":
@@ -308,6 +318,13 @@ def run_chat_loop(base_url: str) -> None:
             except BackendUnavailable as exc:
                 render_error(str(exc))
             continue
+        if message in {"/shutdown", "/server stop"}:
+            try:
+                shutdown_backend(base_url)
+            except BackendUnavailable as exc:
+                render_error(str(exc))
+                continue
+            break
         if message in {"/thinking on", "/thinking off"}:
             enabled = message.endswith("on")
             try:
@@ -335,7 +352,10 @@ def run_chat_loop(base_url: str) -> None:
             continue
         if message.startswith("/model "):
             model_name = message.split(" ", 1)[1].strip()
-            switch_model(base_url, model_name)
+            try:
+                switch_model(base_url, model_name)
+            except BackendUnavailable as exc:
+                render_error(str(exc))
             continue
 
         try:
