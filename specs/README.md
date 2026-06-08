@@ -162,6 +162,7 @@
 - CLI 已有第一版实现，已修正模型列表过滤和无效模型切换错误展示
 - REPL 内部 workspace 命令已实现
 - REPL shutdown 命令已实现
+- Kore 第一版专属图标方向已确认，当前保留用户原始 JPG；CLI 欢迎区、中文帮助和详细状态已升级
 - Chat UI 仍未实质开始
 
 ## 11. api-surface.md

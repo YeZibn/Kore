@@ -14,6 +14,11 @@
 - `channel-interfaces.md` 作为所有面向用户入口的主 spec
 - 历史 `cli.md` 暂时保留为 CLI 第一版详细记录，新任务优先写入本文件
 - CLI 面向最终用户，风格参考 Claude Code，保持简洁、专业、输出层级清晰
+- CLI 欢迎区应展示 Kore 品牌文字、当前运行状态、模型、thinking、workspace、session 与常用命令
+- CLI 欢迎区应使用 ASCII icon + wordmark 表达 Kore 品牌，不直接渲染 JPG 图像
+- CLI `/help` 应使用中文分组说明，覆盖对话、模型、工作空间、服务控制、退出等命令
+- CLI `/status` 应展示更完整的运行状态，包括 backend、health、version、当前模型、可用模型数量、thinking、workspace
+- CLI ASCII icon + wordmark 欢迎区、中文 `/help` 和详细 `/status` 已实现
 - CLI 通过本地 FastAPI 接入 runtime，不重复实现 Agent 调用逻辑
 - CLI 在后端不可达时自动尝试启动本地服务
 - CLI 自动启动的后端默认会常驻；用户可通过 REPL `/shutdown` 主动关闭
@@ -28,6 +33,7 @@
 - `/shutdown` REPL 命令用于关闭当前后端并退出聊天
 - `/server stop` 作为 `/shutdown` 的等价别名
 - `/shutdown` 与 `/server stop` 已实现
+- Kore 第一版专属图标采用用户提供的原始 JPG：`loop + core sparkle + lowercase kore wordmark`
 
 ## CLI 命令结构
 
@@ -68,6 +74,21 @@ shutdown 命令语义：
 - `/server stop` 与 `/shutdown` 等价
 - 成功请求关闭后，CLI 显示提示并退出当前 REPL
 - `/quit` 和 `/exit` 仍只退出聊天，不关闭后端
+
+## Brand Icon
+
+第一版图标方向：
+
+- 主体是 `∞` loop 与 core sparkle 的组合
+- `∞` 表示 Agent loop、ReAct 循环与长期运行
+- sparkle 表示智能核心、工具触发与运行时中枢
+- 完整 logo 使用 lowercase `kore` 字标
+- 第一版直接保存用户提供的 JPG，不再转成 SVG
+- CLI welcome banner 后续可使用简化文字版，不强行渲染图片
+
+当前资产：
+
+- `assets/kore-logo.jpg`
 
 ## 后续方向
 

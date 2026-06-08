@@ -564,6 +564,98 @@ LLM 生成 Plan [Step1, Step2, Step3]
 - 后续事项:
   - 后续可考虑在 CLI 增加更明确的后端生命周期状态展示
 
+### 2026-06-08: Channel interfaces — Kore 品牌图标第一版
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 根据用户提供的设计方向，将 Kore 品牌图标收敛为 `loop + core sparkle + lowercase kore wordmark`
+  - 替换 `assets/kore-icon.svg` 为无字标 symbol 版本
+  - 新增 `assets/kore-logo.svg` 作为带 `kore` 字标的完整 logo 版本
+  - 更新 `specs/channel-interfaces.md` 中的品牌图标方向
+  - 更新 `specs/README.md` 中 channel interfaces 当前概况
+- 关键决策:
+  - 放弃之前的几何 K 方向，采用用户确认的 loop/core sparkle 方向
+  - 第一版采用黑白单色，优先保证小尺寸可读性和多场景适配
+  - App icon / favicon 优先使用 `kore-icon.svg`，完整展示场景使用 `kore-logo.svg`
+- 验证情况:
+  - 已通过 XML 解析校验 `assets/kore-icon.svg`
+  - 已通过 XML 解析校验 `assets/kore-logo.svg`
+- 后续事项:
+  - 后续升级 CLI 时，将品牌方向转成终端 welcome banner 和中文 `/help`
+
+### 2026-06-08: Channel interfaces — Kore 品牌资产改为原始 JPG
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 按用户反馈放弃 SVG 转写方案
+  - 删除生成的 `assets/kore-icon.svg`
+  - 删除生成的 `assets/kore-logo.svg`
+  - 将用户提供的 JPG 保存为 `assets/kore-logo.jpg`
+  - 更新 `specs/channel-interfaces.md` 中的品牌资产说明
+- 关键决策:
+  - 当前阶段保留用户原始设计图，不再手工矢量化
+  - 后续 CLI 中只做文字/ASCII banner，不直接依赖图片渲染
+- 验证情况:
+  - 已确认 `assets/kore-logo.jpg` 写入项目资产目录
+
+### 2026-06-08: Channel interfaces — CLI 欢迎区与中文帮助升级
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 新增 Kore 文字品牌欢迎区
+  - 欢迎区展示后端地址、当前模型、可用模型数、推理开关、工作空间、session 与常用命令
+  - `/help` 改为中文分组帮助，覆盖对话、状态、模型、推理、工作空间、服务、退出和帮助
+  - `/status` 增加后端、健康状态、版本、当前模型、可用模型数、推理开关、工作空间与 provider 配置状态
+  - 将 CLI 运行信息中的主要标签中文化
+- 关键决策:
+  - CLI 不直接渲染 JPG 图像，终端内使用文字品牌和信息面板
+  - `/help` 作为 REPL 内部命令说明入口，不混入外部 shell 命令
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过脚本化 REPL 验证欢迎区、`/help`、`/status` 与 `/shutdown`
+  - 已确认临时验证端口 `9898` 和默认端口 `9899` 均无残留监听进程
+
+### 2026-06-08: Channel interfaces — CLI ASCII 图标接入
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 将 CLI 欢迎区从单纯 `kore` 字标升级为 ASCII icon + wordmark
+  - 使用工具分析用户提供的 JPG，提取暗色主体边界与 icon / wordmark 分区
+  - 基于图片采样生成更贴近原图的 ASCII icon
+  - ASCII icon 表达用户确认的 loop + sparkle 品牌方向
+  - 保留原始 JPG 作为项目品牌资产，不在终端中直接渲染图片
+- 关键决策:
+  - 终端场景使用 ASCII 表达品牌，不依赖图片协议或终端图片能力
+  - ASCII icon 与运行状态面板分离，避免影响状态信息可读性
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过脚本化 REPL 验证欢迎区显示基于图片采样的 ASCII icon + wordmark
+  - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
+
+### 2026-06-08: Channel interfaces — CLI ASCII 图标采样优化
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 基于 JPG 重新调整 icon 裁剪框、输出宽度、高度比例和字符集
+  - 将欢迎区 ASCII icon 替换为更干净的 `icon-symbols-50` 采样版本
+  - 降低噪点和高度占用，使左侧 loop 与右侧 sparkle 更清楚
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过脚本化 REPL 验证精简后的 ASCII icon 欢迎区
+  - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
+
+### 2026-06-08: Channel interfaces — CLI ASCII 图案整体居中
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 为 CLI welcome banner 增加 ASCII 图案整体居中处理
+  - 修正逐行居中导致图案内部比例被破坏的问题
+  - 当前实现只裁掉整块 ASCII 的共同左边距，保留每行内部空格，再由 Rich 居中整个 block
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过脚本化 REPL 验证整体居中后的欢迎区
+  - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
+
 ---
 
 ## 参考资料

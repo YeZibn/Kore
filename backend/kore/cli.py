@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 
 import httpx
 import typer
+from rich.align import Align
 from rich import box
 from rich.console import Console
 from rich.markdown import Markdown
@@ -25,6 +26,28 @@ from rich.text import Text
 DEFAULT_BASE_URL = "http://127.0.0.1:9899"
 DEFAULT_TIMEOUT = 60.0
 BACKEND_LOG_PATH = Path(tempfile.gettempdir()) / "kore-cli-backend.log"
+KORE_BANNER = r"""
+                               =.
+                               :
+                               #=
+      :+*##*+=.               =*+     .*
+   =###+=::=+*###+.          =#=**
+ :##+           :###+      +#*   +#*.
+ ##=               =*+ .+#*:       .=*+=:..   .
+.##:                 +##=.           =##*++. =+:
+ ###             :*##=   =##*     +#*:
+  =###:        *###+         =#* :#+
+    .+##     ##*:              ###.
+         ###                   .#+
+                               :
+                               =.
+
+          __
+         |  | __  ___   _ __   ___
+         |  |/ / / _ \ | '__| / _ \
+         |    < | (_) || |   |  __/
+         |__|\_\ \___/ |_|    \___|
+"""
 
 console = Console()
 app = typer.Typer(
@@ -158,6 +181,17 @@ def render_error(message: str) -> None:
     console.print(Panel(message, title="Error", border_style="red"))
 
 
+def center_ascii_art(art: str) -> str:
+    """Trim shared indentation while preserving the art's internal spacing."""
+    lines = [line.rstrip() for line in art.strip("\n").splitlines()]
+    non_empty_lines = [line for line in lines if line.strip()]
+    shared_indent = min(
+        (len(line) - len(line.lstrip(" ")) for line in non_empty_lines),
+        default=0,
+    )
+    return "\n".join(line[shared_indent:] if line.strip() else "" for line in lines)
+
+
 def render_reply(reply: str, model: str, session_id: str) -> None:
     body = Markdown(reply) if reply.strip() else Text("(empty response)", style="dim")
     title = "Assistant"
@@ -165,22 +199,83 @@ def render_reply(reply: str, model: str, session_id: str) -> None:
     console.print(Panel(body, title=title, subtitle=subtitle, border_style="cyan"))
 
 
+def render_help() -> None:
+    """Render Chinese help for REPL commands."""
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("分类", style="bold cyan", width=12)
+    table.add_column("命令", style="bold")
+    table.add_column("说明", overflow="fold")
+
+    rows = [
+        ("对话", "直接输入内容", "发送消息给 Kore，进入普通 Agent 对话。"),
+        ("状态", "/status", "查看后端、健康状态、版本、模型、推理开关和工作空间等运行信息。"),
+        ("模型", "/model", "列出当前正式可用模型，并标出当前模型。"),
+        ("模型", "/model <模型名>", "切换当前模型；不存在或未接入的模型会提示错误。"),
+        ("推理", "/thinking", "查看 DeepSeek thinking 当前开关状态。"),
+        ("推理", "/thinking on", "开启 DeepSeek thinking。"),
+        ("推理", "/thinking off", "关闭 DeepSeek thinking。"),
+        ("工作空间", "/workspace", "查看当前文件工具沙箱的工作空间根目录。"),
+        ("工作空间", "/workspace <路径>", "切换工作空间；路径必须存在且是目录。"),
+        ("服务", "/shutdown", "关闭当前后端服务，并退出 REPL。"),
+        ("服务", "/server stop", "/shutdown 的等价别名。"),
+        ("退出", "/quit", "只退出当前 REPL，不关闭后端服务。"),
+        ("退出", "/exit", "/quit 的等价别名。"),
+        ("帮助", "/help", "显示这份中文帮助。"),
+    ]
+    for row in rows:
+        table.add_row(*row)
+
+    console.print(Panel(table, title="Kore 帮助", subtitle="REPL 内部命令", border_style="blue"))
+
+
+def render_welcome(
+    *,
+    base_url: str,
+    model: str,
+    thinking: str,
+    workspace_root: str,
+    session_id: str,
+    available_model_count: int,
+) -> None:
+    """Render the REPL welcome panel."""
+    header = Align.center(
+        Text(center_ascii_art(KORE_BANNER), style="bold cyan")
+    )
+
+    table = Table(box=box.SIMPLE, show_header=False, expand=True)
+    table.add_row("后端", base_url)
+    table.add_row("模型", model)
+    table.add_row("可用模型", str(available_model_count))
+    table.add_row("推理开关", thinking)
+    table.add_row("工作空间", workspace_root)
+    table.add_row("Session", session_id[:8])
+    table.add_row("常用命令", "/help  /status  /model  /workspace  /shutdown  /quit")
+
+    console.print(Panel(header, border_style="cyan"))
+    console.print(Panel(table, title="Kore Runtime", border_style="blue"))
+
+
 def render_status(base_url: str) -> None:
     health = request_json("GET", "/health", base_url=base_url)
     status = request_json("GET", "/api/status", base_url=base_url)
     models = request_json("GET", "/api/models/list", base_url=base_url)
     providers = request_json("GET", "/api/models/providers", base_url=base_url)
+    workspace = request_json("GET", "/api/config/workspace", base_url=base_url)
 
-    summary = Table(box=box.SIMPLE, show_header=False)
-    summary.add_row("backend", base_url)
-    summary.add_row("health", health.get("status", "unknown"))
-    summary.add_row("version", status.get("version", "unknown"))
-    summary.add_row("current model", models.get("current_model", "unknown"))
-    console.print(Panel(summary, title="Kore Status", border_style="blue"))
+    summary = Table(box=box.SIMPLE, show_header=False, expand=True)
+    summary.add_row("后端", base_url)
+    summary.add_row("健康状态", health.get("status", "unknown"))
+    summary.add_row("版本", status.get("version", "unknown"))
+    summary.add_row("当前模型", models.get("current_model", "unknown"))
+    summary.add_row("可用模型数", str(len(models.get("models", []))))
+    summary.add_row("DeepSeek thinking", get_deepseek_thinking(base_url))
+    summary.add_row("工作空间", workspace.get("workspace_root", "unknown"))
+    summary.add_row("工作空间有效", "yes" if workspace.get("is_directory") else "no")
+    console.print(Panel(summary, title="Kore 状态", border_style="blue"))
 
     provider_table = Table(box=box.SIMPLE_HEAVY)
-    provider_table.add_column("Provider", style="bold")
-    provider_table.add_column("Configured")
+    provider_table.add_column("服务商", style="bold")
+    provider_table.add_column("已配置")
     provider_table.add_column("Base URL", overflow="fold")
     for provider in providers.get("providers", []):
         configured = "[green]yes[/]" if provider["configured"] else "[red]no[/]"
@@ -194,7 +289,7 @@ def render_models(base_url: str) -> None:
 
     table = Table(box=box.SIMPLE_HEAVY)
     table.add_column("Model", style="bold")
-    table.add_column("Provider")
+    table.add_column("服务商")
     table.add_column("Current")
 
     for item in data.get("models", []):
@@ -208,10 +303,10 @@ def render_models(base_url: str) -> None:
 def render_config(base_url: str) -> None:
     data = request_json("GET", "/api/config/models", base_url=base_url)
     table = Table(box=box.SIMPLE_HEAVY)
-    table.add_column("Provider", style="bold")
+    table.add_column("服务商", style="bold")
     table.add_column("API Key")
     table.add_column("Base URL", overflow="fold")
-    table.add_column("Thinking")
+    table.add_column("推理开关")
     for provider, cfg in data.get("providers", {}).items():
         thinking = cfg.get("thinking_enabled")
         thinking_text = "-" if thinking is None else ("on" if thinking else "off")
@@ -260,19 +355,15 @@ def run_chat_loop(base_url: str) -> None:
     session_id = str(uuid.uuid4())
     models = request_json("GET", "/api/models/list", base_url=base_url)
     current_model = models.get("current_model", "unknown")
-
-    intro = Table(box=None, show_header=False, pad_edge=False)
-    intro.add_row("backend", base_url)
-    intro.add_row("model", current_model)
-    intro.add_row("thinking", get_deepseek_thinking(base_url))
     workspace = request_json("GET", "/api/config/workspace", base_url=base_url)
-    intro.add_row("workspace", workspace.get("workspace_root", "unknown"))
-    intro.add_row("session", session_id[:8])
-    intro.add_row(
-        "tips",
-        "/status  /model  /thinking  /workspace  /shutdown  /help  /quit",
+    render_welcome(
+        base_url=base_url,
+        model=current_model,
+        thinking=get_deepseek_thinking(base_url),
+        workspace_root=workspace.get("workspace_root", "unknown"),
+        session_id=session_id,
+        available_model_count=len(models.get("models", [])),
     )
-    console.print(Panel(intro, title="Kore", border_style="blue"))
 
     while True:
         try:
@@ -287,11 +378,7 @@ def run_chat_loop(base_url: str) -> None:
         if message in {"/exit", "/quit"}:
             break
         if message == "/help":
-            console.print(
-                "Commands: /status, /model, /model <name>, /thinking, /thinking on, "
-                "/thinking off, /workspace, /workspace <path>, /shutdown, "
-                "/server stop, /quit"
-            )
+            render_help()
             continue
         if message == "/status":
             render_status(base_url)
