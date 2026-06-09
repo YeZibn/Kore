@@ -656,6 +656,44 @@ LLM 生成 Plan [Step1, Step2, Step3]
   - 已通过脚本化 REPL 验证整体居中后的欢迎区
   - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
 
+### 2026-06-08: LLM system — 模型切换持久化
+
+- 对应 spec: `specs/llm-system.md`、`specs/api-surface.md`
+- 完成内容:
+  - 修复模型切换只写内存、不写配置的问题
+  - `POST /api/models/switch` 成功后同步更新 `config.agent.chat_model`
+  - `POST /api/models/switch` 成功后写回 `.env` 的 `KORE_AGENT__CHAT_MODEL`
+  - 后端重启时会从 `.env` 恢复上次选择的 chat model
+- 关键决策:
+  - 模型切换属于用户配置，应持久化到 `.env`
+  - 无效模型仍然先返回 400，不写入 runtime config 或 `.env`
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过 FastAPI TestClient 验证切换 `deepseek-v4-pro` 成功
+  - 已验证切换后 `.env` 中 `KORE_AGENT__CHAT_MODEL=deepseek-v4-pro`
+  - 已模拟重启并验证 `/api/models/list` 恢复为 `deepseek-v4-pro`
+  - 测试结束后已恢复 `.env` 原内容
+
+### 2026-06-09: Channel interfaces — REPL 对话与后端重启命令
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 新增 REPL 内部命令 `/chat restart`
+  - 新增 REPL 内部命令 `/server restart`
+  - `/chat restart` 会生成新的 session id，并刷新欢迎区状态
+  - `/server restart` 会请求后端 shutdown，等待服务停止，再由 CLI 自动拉起新后端
+  - `/server restart` 成功后刷新模型、thinking、workspace 和 session 状态，并继续停留在 REPL
+  - `/help` 与欢迎区常用命令已补充新命令
+- 关键决策:
+  - 对话重启只重置 session，不重启后端
+  - 后端重启复用已有 shutdown API，不新增新的后端 restart API
+  - `/server restart` 不改变 `.env` 持久化配置
+- 验证情况:
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过脚本化 REPL 验证 `/chat restart` 生成新 session 并刷新欢迎区
+  - 已通过脚本化 REPL 验证 `/server restart` 能停止并重新拉起临时后端
+  - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
+
 ---
 
 ## 参考资料

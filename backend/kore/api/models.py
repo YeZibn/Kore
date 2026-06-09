@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from kore.config import update_env_file
 from kore.runtime.models import SUPPORTED_PROVIDERS
 
 models_router = APIRouter()
@@ -54,10 +55,13 @@ async def list_models(request: Request) -> ModelListResponse:
 async def switch_model(request: Request, body: SwitchRequest) -> SwitchResponse:
     """Switch the current model."""
     model_state = request.app.state.model_state
+    config = request.app.state.config
     try:
         model_state.switch(body.model)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    config.agent.chat_model = model_state.current_model
+    update_env_file({"KORE_AGENT__CHAT_MODEL": model_state.current_model})
     return SwitchResponse(success=True, current_model=model_state.current_model)
 
 

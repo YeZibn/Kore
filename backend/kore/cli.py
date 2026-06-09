@@ -208,6 +208,7 @@ def render_help() -> None:
 
     rows = [
         ("对话", "直接输入内容", "发送消息给 Kore，进入普通 Agent 对话。"),
+        ("对话", "/chat restart", "重开当前对话，生成新的 session，不重启后端。"),
         ("状态", "/status", "查看后端、健康状态、版本、模型、推理开关和工作空间等运行信息。"),
         ("模型", "/model", "列出当前正式可用模型，并标出当前模型。"),
         ("模型", "/model <模型名>", "切换当前模型；不存在或未接入的模型会提示错误。"),
@@ -218,6 +219,7 @@ def render_help() -> None:
         ("工作空间", "/workspace <路径>", "切换工作空间；路径必须存在且是目录。"),
         ("服务", "/shutdown", "关闭当前后端服务，并退出 REPL。"),
         ("服务", "/server stop", "/shutdown 的等价别名。"),
+        ("服务", "/server restart", "重启当前后端服务，重启后留在 REPL 中继续使用。"),
         ("退出", "/quit", "只退出当前 REPL，不关闭后端服务。"),
         ("退出", "/exit", "/quit 的等价别名。"),
         ("帮助", "/help", "显示这份中文帮助。"),
@@ -249,7 +251,7 @@ def render_welcome(
     table.add_row("推理开关", thinking)
     table.add_row("工作空间", workspace_root)
     table.add_row("Session", session_id[:8])
-    table.add_row("常用命令", "/help  /status  /model  /workspace  /shutdown  /quit")
+    table.add_row("常用命令", "/help  /status  /model  /chat restart  /server restart")
 
     console.print(Panel(header, border_style="cyan"))
     console.print(Panel(table, title="Kore Runtime", border_style="blue"))
@@ -343,6 +345,17 @@ def shutdown_backend(base_url: str) -> None:
     console.print(Panel(message, title="Shutdown", border_style="yellow"))
 
 
+def restart_backend(base_url: str) -> None:
+    """Restart the local backend and wait until it becomes healthy again."""
+    request_json("POST", "/api/server/shutdown", base_url=base_url)
+    for _ in range(40):
+        if not _healthcheck(base_url):
+            break
+        time.sleep(0.25)
+    ensure_backend(base_url)
+    console.print(Panel("Backend restarted.", title="Server Restarted", border_style="green"))
+
+
 def get_deepseek_thinking(base_url: str) -> str:
     data = request_json("GET", "/api/config/models", base_url=base_url)
     deepseek = data.get("providers", {}).get("deepseek", {})
@@ -350,20 +363,23 @@ def get_deepseek_thinking(base_url: str) -> str:
     return "on" if thinking else "off"
 
 
-def run_chat_loop(base_url: str) -> None:
-    ensure_backend(base_url)
-    session_id = str(uuid.uuid4())
+def render_current_welcome(base_url: str, session_id: str) -> None:
     models = request_json("GET", "/api/models/list", base_url=base_url)
-    current_model = models.get("current_model", "unknown")
     workspace = request_json("GET", "/api/config/workspace", base_url=base_url)
     render_welcome(
         base_url=base_url,
-        model=current_model,
+        model=models.get("current_model", "unknown"),
         thinking=get_deepseek_thinking(base_url),
         workspace_root=workspace.get("workspace_root", "unknown"),
         session_id=session_id,
         available_model_count=len(models.get("models", [])),
     )
+
+
+def run_chat_loop(base_url: str) -> None:
+    ensure_backend(base_url)
+    session_id = str(uuid.uuid4())
+    render_current_welcome(base_url, session_id)
 
     while True:
         try:
@@ -379,6 +395,17 @@ def run_chat_loop(base_url: str) -> None:
             break
         if message == "/help":
             render_help()
+            continue
+        if message == "/chat restart":
+            session_id = str(uuid.uuid4())
+            console.print(
+                Panel(
+                    f"已重开对话。新的 session: [bold]{session_id[:8]}[/]",
+                    title="Chat Restarted",
+                    border_style="green",
+                )
+            )
+            render_current_welcome(base_url, session_id)
             continue
         if message == "/status":
             render_status(base_url)
@@ -412,6 +439,14 @@ def run_chat_loop(base_url: str) -> None:
                 render_error(str(exc))
                 continue
             break
+        if message == "/server restart":
+            try:
+                restart_backend(base_url)
+                session_id = str(uuid.uuid4())
+                render_current_welcome(base_url, session_id)
+            except BackendUnavailable as exc:
+                render_error(str(exc))
+            continue
         if message in {"/thinking on", "/thinking off"}:
             enabled = message.endswith("on")
             try:

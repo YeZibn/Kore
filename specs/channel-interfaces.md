@@ -33,6 +33,9 @@
 - `/shutdown` REPL 命令用于关闭当前后端并退出聊天
 - `/server stop` 作为 `/shutdown` 的等价别名
 - `/shutdown` 与 `/server stop` 已实现
+- `/chat restart` REPL 命令用于重开当前对话 session，不重启后端
+- `/server restart` REPL 命令用于重启当前后端服务，并留在 REPL 中继续使用
+- `/chat restart` 与 `/server restart` 已实现
 - Kore 第一版专属图标采用用户提供的原始 JPG：`loop + core sparkle + lowercase kore wordmark`
 
 ## CLI 命令结构
@@ -56,8 +59,10 @@
 - `/thinking off`
 - `/workspace`
 - `/workspace <path>`
+- `/chat restart`
 - `/shutdown`
 - `/server stop`
+- `/server restart`
 - `/quit`
 - `/exit`
 
@@ -74,6 +79,13 @@ shutdown 命令语义：
 - `/server stop` 与 `/shutdown` 等价
 - 成功请求关闭后，CLI 显示提示并退出当前 REPL
 - `/quit` 和 `/exit` 仍只退出聊天，不关闭后端
+
+restart 命令语义：
+
+- `/chat restart` 生成新的 session id，并刷新欢迎状态，不关闭后端
+- `/server restart` 调用 shutdown API，等待当前后端停止，再由 CLI 自动启动新后端
+- `/server restart` 成功后刷新模型、thinking、workspace 等运行状态，并继续停留在 REPL
+- `/server restart` 不改变 `.env` 中的持久化配置
 
 ## Brand Icon
 

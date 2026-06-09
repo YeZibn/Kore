@@ -65,7 +65,7 @@
 - reasoning / thinking 能力映射
 
 当前概况：
-- 已具备 OpenAI-compatible 抽象、DeepSeek 官方模型展示修正、thinking 配置、可用模型过滤和无效模型切换校验
+- 已具备 OpenAI-compatible 抽象、DeepSeek 官方模型展示修正、thinking 配置、可用模型过滤、无效模型切换校验和模型切换持久化
 
 ## 5. tool-system.md
 
@@ -162,6 +162,7 @@
 - CLI 已有第一版实现，已修正模型列表过滤和无效模型切换错误展示
 - REPL 内部 workspace 命令已实现
 - REPL shutdown 命令已实现
+- REPL chat restart / server restart 命令已实现
 - Kore 第一版专属图标方向已确认，当前保留用户原始 JPG；CLI 欢迎区、中文帮助和详细状态已升级
 - Chat UI 仍未实质开始
 
@@ -178,7 +179,7 @@
 - 客户端与后端边界
 
 当前概况：
-- 已有最小 REST API，workspace config API、模型切换校验与 shutdown API 已实现
+- 已有最小 REST API，workspace config API、模型切换校验、模型切换持久化与 shutdown API 已实现
 
 ## 12. safety-and-policy.md
 

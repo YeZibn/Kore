@@ -30,6 +30,7 @@
 - API key 返回时必须脱敏
 - 模型列表只展示当前明确支持 API 调用的模型
 - 模型切换接口必须拒绝不存在或未正式接入的模型，并返回 4xx 错误
+- 模型切换接口成功后必须更新 runtime config 并写回 `.env`
 - `thinking` 属于 provider 配置项，由 config API 暴露
 - `workspace_root` 属于安全/运行配置，不归入 LLM provider 配置
 - 更新 workspace 时必须校验路径存在且为目录
