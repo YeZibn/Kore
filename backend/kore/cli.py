@@ -14,18 +14,35 @@ from urllib.parse import urlparse
 
 import httpx
 import typer
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.history import InMemoryHistory
 from rich.align import Align
 from rich import box
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
 DEFAULT_BASE_URL = "http://127.0.0.1:9899"
 DEFAULT_TIMEOUT = 60.0
 BACKEND_LOG_PATH = Path(tempfile.gettempdir()) / "kore-cli-backend.log"
+REPL_COMMANDS = [
+    "/help",
+    "/status",
+    "/model",
+    "/thinking",
+    "/thinking on",
+    "/thinking off",
+    "/workspace",
+    "/chat restart",
+    "/shutdown",
+    "/server stop",
+    "/server restart",
+    "/quit",
+    "/exit",
+]
 KORE_BANNER = r"""
                                =.
                                :
@@ -376,14 +393,28 @@ def render_current_welcome(base_url: str, session_id: str) -> None:
     )
 
 
+def read_repl_input(prompt_session: PromptSession[str] | None) -> str:
+    """Read one REPL input line with prompt_toolkit when attached to a TTY."""
+    if prompt_session is None:
+        return input("you> ")
+    return prompt_session.prompt("you> ")
+
+
 def run_chat_loop(base_url: str) -> None:
     ensure_backend(base_url)
     session_id = str(uuid.uuid4())
     render_current_welcome(base_url, session_id)
+    prompt_session: PromptSession[str] | None = None
+    if sys.stdin.isatty():
+        prompt_session = PromptSession(
+            history=InMemoryHistory(),
+            completer=WordCompleter(REPL_COMMANDS, ignore_case=True, sentence=True),
+            complete_while_typing=True,
+        )
 
     while True:
         try:
-            message = Prompt.ask("[bold cyan]you[/]").strip()
+            message = read_repl_input(prompt_session).strip()
         except (KeyboardInterrupt, EOFError):
             console.print()
             break

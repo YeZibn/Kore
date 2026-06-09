@@ -19,6 +19,9 @@
 - CLI `/help` 应使用中文分组说明，覆盖对话、模型、工作空间、服务控制、退出等命令
 - CLI `/status` 应展示更完整的运行状态，包括 backend、health、version、当前模型、可用模型数量、thinking、workspace
 - CLI ASCII icon + wordmark 欢迎区、中文 `/help` 和详细 `/status` 已实现
+- CLI REPL 输入层应使用 `prompt_toolkit`，避免 `rich.prompt` 在中文、长文本和退格编辑上的不稳定
+- CLI REPL 输入层应支持基础历史记录和内部命令补全
+- CLI REPL 输入层已升级为 `prompt_toolkit`；非 TTY 输入回退到 `input()`，便于脚本化验证
 - CLI 通过本地 FastAPI 接入 runtime，不重复实现 Agent 调用逻辑
 - CLI 在后端不可达时自动尝试启动本地服务
 - CLI 自动启动的后端默认会常驻；用户可通过 REPL `/shutdown` 主动关闭

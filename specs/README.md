@@ -164,6 +164,7 @@
 - REPL shutdown 命令已实现
 - REPL chat restart / server restart 命令已实现
 - Kore 第一版专属图标方向已确认，当前保留用户原始 JPG；CLI 欢迎区、中文帮助和详细状态已升级
+- REPL 输入层已升级为 prompt_toolkit，提升中文、退格、长文本编辑、历史记录和命令补全体验
 - Chat UI 仍未实质开始
 
 ## 11. api-surface.md

@@ -694,6 +694,26 @@ LLM 生成 Plan [Step1, Step2, Step3]
   - 已通过脚本化 REPL 验证 `/server restart` 能停止并重新拉起临时后端
   - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
 
+### 2026-06-09: Channel interfaces — REPL 输入层升级
+
+- 对应 spec: `specs/channel-interfaces.md`
+- 完成内容:
+  - 将 REPL 输入从 `rich.prompt.Prompt.ask()` 切换到 `prompt_toolkit.PromptSession`
+  - 新增 REPL 内部命令补全
+  - 新增内存级历史记录
+  - 非 TTY 输入回退到 `input()`，保持脚本化验证不输出 prompt_toolkit 警告
+  - 在 `backend/pyproject.toml` 中新增 `prompt-toolkit>=3.0.0` 依赖
+- 关键决策:
+  - 交互终端优先使用 `prompt_toolkit`，解决中文、退格和长文本编辑体验问题
+  - 历史记录第一版只保存在当前进程内，不落盘
+  - 自动补全第一版只覆盖内部 slash commands
+- 验证情况:
+  - 已安装 `prompt-toolkit==3.0.52` 到当前 agent conda 环境
+  - 已通过 `python -m compileall backend/kore`
+  - 已通过脚本化 REPL 验证 `/help` 和 `/shutdown`
+  - 已确认非 TTY 输入不再输出 `Input is not a terminal` 警告
+  - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
+
 ---
 
 ## 参考资料
