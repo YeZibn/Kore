@@ -714,6 +714,24 @@ LLM 生成 Plan [Step1, Step2, Step3]
   - 已确认非 TTY 输入不再输出 `Input is not a terminal` 警告
   - 已通过 `/shutdown` 关闭临时验证后端，确认 `9898` 无残留监听进程
 
+### 2026-06-09: ReAct / Channel interfaces — 实时 Trace 输出第一版
+
+- 对应 spec: `specs/react-loop.md`、`specs/api-surface.md`、`specs/channel-interfaces.md`
+- 完成内容:
+  - 新增 `AgentCore.run_with_events()`，在 Direct ReAct loop 中发送结构化公开 trace 事件
+  - 新增 `POST /api/chat/stream` SSE 接口，实时返回 run、LLM step、工具调用、确认请求、完成和失败事件
+  - 新增 REPL 内部命令 `/trace on`、`/trace off`
+  - `/trace on` 后普通聊天请求走 SSE stream，并用 Rich 面板/表格实时展示执行过程
+  - `/trace off` 后继续使用原有 `/api/chat/send` 完整回复路径
+- 关键决策:
+  - 第一版只展示公开执行轨迹，不输出模型隐藏 chain-of-thought
+  - provider 将来如果返回可展示 thinking/reasoning 字段，再作为独立事件接入
+  - trace 开关第一版只保存在当前 REPL 进程内，不写入 `.env`
+  - trace 第一版不做长期存储、请求取消或工具内部更细粒度事件
+- 验证情况:
+  - 已通过 `/opt/miniconda3/envs/agent/bin/python -m compileall backend/kore`
+  - 已通过 FastAPI TestClient 注入 fake agent 验证 `/api/chat/stream` 返回 SSE 事件序列和最终 `run_completed.reply`
+
 ---
 
 ## 参考资料

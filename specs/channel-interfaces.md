@@ -22,6 +22,9 @@
 - CLI REPL 输入层应使用 `prompt_toolkit`，避免 `rich.prompt` 在中文、长文本和退格编辑上的不稳定
 - CLI REPL 输入层应支持基础历史记录和内部命令补全
 - CLI REPL 输入层已升级为 `prompt_toolkit`；非 TTY 输入回退到 `input()`，便于脚本化验证
+- CLI 支持 `/trace on`、`/trace off` 控制实时执行轨迹显示
+- CLI trace 输出必须使用 Rich 面板/表格包裹，保持当前视觉风格
+- CLI trace 第一版展示工具过程、LLM step、confirmation 和 run summary，不展示模型隐藏思维链
 - CLI 通过本地 FastAPI 接入 runtime，不重复实现 Agent 调用逻辑
 - CLI 在后端不可达时自动尝试启动本地服务
 - CLI 自动启动的后端默认会常驻；用户可通过 REPL `/shutdown` 主动关闭
@@ -60,6 +63,8 @@
 - `/thinking`
 - `/thinking on`
 - `/thinking off`
+- `/trace on`
+- `/trace off`
 - `/workspace`
 - `/workspace <path>`
 - `/chat restart`
@@ -89,6 +94,14 @@ restart 命令语义：
 - `/server restart` 调用 shutdown API，等待当前后端停止，再由 CLI 自动启动新后端
 - `/server restart` 成功后刷新模型、thinking、workspace 等运行状态，并继续停留在 REPL
 - `/server restart` 不改变 `.env` 中的持久化配置
+
+trace 命令语义：
+
+- `/trace on` 后普通聊天请求走 `POST /api/chat/stream`
+- `/trace off` 后普通聊天请求走 `POST /api/chat/send`
+- trace 事件用 Rich 面板/表格实时输出
+- trace 不输出模型隐藏 chain-of-thought，只输出可公开执行轨迹
+- 第一版 trace 开关只保存在当前 REPL 进程内，不写入 `.env`
 
 ## Brand Icon
 

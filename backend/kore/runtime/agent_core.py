@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from kore.config import KoreConfig
@@ -18,6 +19,8 @@ from kore.tools.executor import ToolExecutor
 from kore.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+TraceSink = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 class AgentCore:
@@ -65,7 +68,49 @@ class AgentCore:
             logger.error("Run %s: failed with error: %s", ctx.run_id, e)
             raise
 
-    async def _run_direct(self, message: str, ctx: RunContext) -> str:
+    async def run_with_events(
+        self,
+        message: str,
+        session_id: str,
+        event_sink: TraceSink,
+    ) -> str:
+        """Process a user message and emit public trace events."""
+        ctx = RunContext(run_id=str(uuid.uuid4()), user_message=message)
+        await event_sink({
+            "type": "run_started",
+            "run_id": ctx.run_id,
+            "session_id": session_id,
+            "mode": RunMode.DIRECT.value,
+            "model": self.model_state.current_model,
+        })
+
+        try:
+            reply = await self._run_direct(message, ctx, event_sink=event_sink)
+            ctx.status = RunStatus.COMPLETED
+            await event_sink({
+                "type": "run_completed",
+                "run_id": ctx.run_id,
+                "reply": reply,
+                "model": self.model_state.current_model,
+                "total_tokens": ctx.total_tokens,
+                "total_tool_calls": ctx.total_tool_calls,
+            })
+            return reply
+        except Exception as e:
+            ctx.status = RunStatus.FAILED
+            await event_sink({
+                "type": "run_failed",
+                "run_id": ctx.run_id,
+                "error": str(e),
+            })
+            raise
+
+    async def _run_direct(
+        self,
+        message: str,
+        ctx: RunContext,
+        event_sink: TraceSink | None = None,
+    ) -> str:
         """Direct mode: simple ReAct loop.
 
         Flow:
@@ -98,6 +143,13 @@ class AgentCore:
         max_steps = self.config.agent.max_direct_steps
         for step in range(max_steps):
             logger.debug("Run %s: step %d, model=%s", ctx.run_id, step, model)
+            if event_sink is not None:
+                await event_sink({
+                    "type": "llm_step_started",
+                    "run_id": ctx.run_id,
+                    "step": step + 1,
+                    "model": model,
+                })
 
             response = await llm.chat(
                 messages=messages,
@@ -108,6 +160,15 @@ class AgentCore:
 
             # Track usage
             ctx.total_tokens += response.usage.total_tokens
+            if event_sink is not None:
+                await event_sink({
+                    "type": "llm_step_completed",
+                    "run_id": ctx.run_id,
+                    "step": step + 1,
+                    "tool_call_count": len(response.tool_calls or []),
+                    "content_preview": self._preview(response.content),
+                    "tokens": response.usage.total_tokens,
+                })
 
             # If no tool calls, this is the final reply
             if not response.tool_calls:
@@ -126,8 +187,36 @@ class AgentCore:
             messages.append(assistant_msg)
 
             # Execute tool calls
+            if event_sink is not None:
+                for tool_call in response.tool_calls:
+                    await event_sink({
+                        "type": "tool_call_started",
+                        "run_id": ctx.run_id,
+                        "step": step + 1,
+                        "call_id": tool_call.id,
+                        "name": tool_call.name,
+                        "arguments": self._preview(tool_call.arguments, max_chars=240),
+                    })
             tool_results = await self.tool_executor.execute(response.tool_calls)
             ctx.total_tool_calls += len(tool_results)
+            if event_sink is not None:
+                for result in tool_results:
+                    event_type = (
+                        "tool_confirmation_required"
+                        if result.error_type == "confirmation_required"
+                        else "tool_call_completed"
+                    )
+                    await event_sink({
+                        "type": event_type,
+                        "run_id": ctx.run_id,
+                        "step": step + 1,
+                        "call_id": result.call_id,
+                        "name": result.name,
+                        "ok": result.ok,
+                        "error_type": result.error_type,
+                        "output_preview": self._preview(result.output, max_chars=360),
+                        "metadata": result.metadata,
+                    })
 
             # Append tool results to messages
             for result in tool_results:
@@ -146,3 +235,12 @@ class AgentCore:
         response = await llm.chat(messages=messages, model=model, **llm_kwargs)
         ctx.total_tokens += response.usage.total_tokens
         return response.content
+
+    @staticmethod
+    def _preview(value: str | None, *, max_chars: int = 160) -> str:
+        if not value:
+            return ""
+        compact = " ".join(str(value).split())
+        if len(compact) <= max_chars:
+            return compact
+        return compact[: max_chars - 3] + "..."

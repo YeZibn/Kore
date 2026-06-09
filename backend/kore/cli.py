@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 import subprocess
 import sys
 import tempfile
@@ -35,6 +36,8 @@ REPL_COMMANDS = [
     "/thinking",
     "/thinking on",
     "/thinking off",
+    "/trace on",
+    "/trace off",
     "/workspace",
     "/chat restart",
     "/shutdown",
@@ -232,6 +235,8 @@ def render_help() -> None:
         ("推理", "/thinking", "查看 DeepSeek thinking 当前开关状态。"),
         ("推理", "/thinking on", "开启 DeepSeek thinking。"),
         ("推理", "/thinking off", "关闭 DeepSeek thinking。"),
+        ("轨迹", "/trace on", "开启实时执行轨迹，显示模型步骤和工具过程。"),
+        ("轨迹", "/trace off", "关闭实时执行轨迹，只显示最终回答。"),
         ("工作空间", "/workspace", "查看当前文件工具沙箱的工作空间根目录。"),
         ("工作空间", "/workspace <路径>", "切换工作空间；路径必须存在且是目录。"),
         ("服务", "/shutdown", "关闭当前后端服务，并退出 REPL。"),
@@ -300,6 +305,102 @@ def render_status(base_url: str) -> None:
         configured = "[green]yes[/]" if provider["configured"] else "[red]no[/]"
         provider_table.add_row(provider["name"], configured, provider["base_url"])
     console.print(provider_table)
+
+
+def render_trace_event(event: dict[str, Any]) -> None:
+    """Render one public trace event using Rich panels."""
+    event_type = event.get("type", "message")
+    table = Table(box=box.SIMPLE, show_header=False, expand=True)
+    border_style = "blue"
+    title = event_type
+
+    if event_type == "run_started":
+        title = "Run Started"
+        table.add_row("模型", str(event.get("model", "")))
+        table.add_row("Session", str(event.get("session_id", ""))[:8])
+        table.add_row("Run", str(event.get("run_id", ""))[:8])
+    elif event_type == "llm_step_started":
+        title = f"Agent Step {event.get('step')}"
+        border_style = "cyan"
+        table.add_row("阶段", "调用模型")
+        table.add_row("模型", str(event.get("model", "")))
+    elif event_type == "llm_step_completed":
+        title = f"Step {event.get('step')} Completed"
+        border_style = "cyan"
+        table.add_row("工具调用数", str(event.get("tool_call_count", 0)))
+        table.add_row("Tokens", str(event.get("tokens", 0)))
+        if event.get("content_preview"):
+            table.add_row("输出摘要", str(event.get("content_preview")))
+    elif event_type == "tool_call_started":
+        title = "Tool Call"
+        border_style = "yellow"
+        table.add_row("工具", str(event.get("name", "")))
+        table.add_row("状态", "running")
+        table.add_row("参数", str(event.get("arguments", "")))
+    elif event_type == "tool_call_completed":
+        title = "Tool Result"
+        border_style = "green" if event.get("ok") else "red"
+        metadata = event.get("metadata") or {}
+        table.add_row("工具", str(event.get("name", "")))
+        table.add_row("状态", "ok" if event.get("ok") else "failed")
+        table.add_row("错误类型", str(event.get("error_type") or "-"))
+        table.add_row("耗时", f"{metadata.get('duration_ms', 0)}ms")
+        table.add_row("输出摘要", str(event.get("output_preview", "")))
+    elif event_type == "tool_confirmation_required":
+        title = "Confirmation Required"
+        border_style = "magenta"
+        metadata = event.get("metadata") or {}
+        table.add_row("工具", str(event.get("name", "")))
+        table.add_row("请求路径", str(metadata.get("resolved_path", "")))
+        table.add_row("工作空间", str(metadata.get("workspace_root", "")))
+        table.add_row("原因", "workspace 外路径需要用户确认")
+    elif event_type == "run_completed":
+        title = "Run Completed"
+        border_style = "green"
+        table.add_row("Tokens", str(event.get("total_tokens", 0)))
+        table.add_row("工具调用数", str(event.get("total_tool_calls", 0)))
+    elif event_type == "run_failed":
+        title = "Run Failed"
+        border_style = "red"
+        table.add_row("错误", str(event.get("error", "")))
+    else:
+        table.add_row("事件", json.dumps(event, ensure_ascii=False))
+
+    console.print(Panel(table, title=title, border_style=border_style))
+
+
+def stream_chat(base_url: str, message: str, session_id: str) -> dict[str, Any]:
+    """Stream chat trace events and return the final event payload."""
+    ensure_backend(base_url)
+    final_event: dict[str, Any] = {}
+    try:
+        with _client(base_url) as client:
+            with client.stream(
+                "POST",
+                "/api/chat/stream",
+                json={"message": message, "session_id": session_id},
+            ) as response:
+                response.raise_for_status()
+                data_lines: list[str] = []
+                for line in response.iter_lines():
+                    if not line:
+                        if data_lines:
+                            payload = json.loads("\n".join(data_lines))
+                            render_trace_event(payload)
+                            if payload.get("type") in {"run_completed", "run_failed"}:
+                                final_event = payload
+                            data_lines = []
+                        continue
+                    if line.startswith("event:"):
+                        continue
+                    elif line.startswith("data:"):
+                        data_lines.append(line.split(":", 1)[1].strip())
+                return final_event
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text.strip() or str(exc)
+        raise BackendUnavailable(detail) from exc
+    except httpx.HTTPError as exc:
+        raise BackendUnavailable(str(exc)) from exc
 
 
 def render_models(base_url: str) -> None:
@@ -403,6 +504,7 @@ def read_repl_input(prompt_session: PromptSession[str] | None) -> str:
 def run_chat_loop(base_url: str) -> None:
     ensure_backend(base_url)
     session_id = str(uuid.uuid4())
+    trace_enabled = False
     render_current_welcome(base_url, session_id)
     prompt_session: PromptSession[str] | None = None
     if sys.stdin.isatty():
@@ -446,6 +548,14 @@ def run_chat_loop(base_url: str) -> None:
             continue
         if message == "/thinking":
             console.print(f"DeepSeek thinking: [bold]{get_deepseek_thinking(base_url)}[/]")
+            continue
+        if message == "/trace on":
+            trace_enabled = True
+            console.print(Panel("实时执行轨迹：on", title="Trace", border_style="green"))
+            continue
+        if message == "/trace off":
+            trace_enabled = False
+            console.print(Panel("实时执行轨迹：off", title="Trace", border_style="yellow"))
             continue
         if message == "/workspace":
             try:
@@ -512,6 +622,14 @@ def run_chat_loop(base_url: str) -> None:
             continue
 
         try:
+            if trace_enabled:
+                final_event = stream_chat(base_url, message, session_id)
+                render_reply(
+                    final_event.get("reply", ""),
+                    final_event.get("model", "unknown"),
+                    session_id,
+                )
+                continue
             response = request_json(
                 "POST",
                 "/api/chat/send",

@@ -23,10 +23,12 @@
 | GET | `/api/config/workspace` | 获取当前 workspace 配置 |
 | PUT | `/api/config/workspace` | 更新当前 workspace 配置 |
 | POST | `/api/server/shutdown` | 请求当前后端进程优雅关闭 |
+| POST | `/api/chat/stream` | SSE 实时返回 Agent 执行 trace 与最终回复 |
 
 ## 当前约束
 
 - Chat API 第一版返回完整回复，不做 SSE 流式
+- Chat Stream API 第一版通过 SSE 返回结构化 trace 事件与最终回复
 - API key 返回时必须脱敏
 - 模型列表只展示当前明确支持 API 调用的模型
 - 模型切换接口必须拒绝不存在或未正式接入的模型，并返回 4xx 错误
@@ -80,7 +82,30 @@ Response: { "success": true, "message": "Server shutdown requested." }
 - 第一版使用 SIGTERM 关闭当前 uvicorn 进程
 - 不把 `/quit` 或 `/exit` 等同于关闭后端，避免用户只是退出聊天时误停服务
 
+## Chat Stream API
+
+```text
+POST /api/chat/stream
+Request:  { "message": "用户消息", "session_id": "" }
+SSE events:
+  run_started
+  llm_step_started
+  llm_step_completed
+  tool_call_started
+  tool_call_completed
+  tool_confirmation_required
+  run_completed
+  run_failed
+```
+
+约束：
+
+- SSE event `data` 使用 JSON
+- 最终回答通过 `run_completed.reply` 返回
+- 不通过该接口输出模型隐藏 chain-of-thought
+- CLI 负责将事件渲染为 Rich 面板/表格
+
 ## 待确认事项
 
-- 后续是否为 ReAct 步骤、工具调用和确认请求补充 SSE / 事件流
+- 后续是否为 trace 增加持久化、请求取消和更细粒度工具内部事件
 - 后续是否将 confirmation 设计成专用 API 协议
