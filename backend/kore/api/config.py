@@ -46,6 +46,14 @@ class UpdateWorkspaceRequest(BaseModel):
     workspace_root: str
 
 
+class CLIConfigResponse(BaseModel):
+    trace_enabled: bool
+
+
+class UpdateCLIConfigRequest(BaseModel):
+    trace_enabled: bool | None = None
+
+
 def _mask_key(key: str) -> str:
     """Mask API key for display, showing only first 3 and last 4 chars."""
     if len(key) <= 8:
@@ -169,3 +177,30 @@ async def update_workspace_config(
     logger.info("Updated workspace root: %s", workspace_root)
 
     return _workspace_response(workspace_root)
+
+
+@config_router.get("/cli", response_model=CLIConfigResponse)
+async def get_cli_config(request: Request) -> CLIConfigResponse:
+    """Get persisted CLI preferences."""
+    config = request.app.state.config
+    return CLIConfigResponse(trace_enabled=config.cli.trace_enabled)
+
+
+@config_router.put("/cli", response_model=CLIConfigResponse)
+async def update_cli_config(
+    request: Request,
+    body: UpdateCLIConfigRequest,
+) -> CLIConfigResponse:
+    """Update CLI preferences in memory and persist them to backend/.env."""
+    config = request.app.state.config
+    env_updates: dict[str, str] = {}
+
+    if body.trace_enabled is not None:
+        config.cli.trace_enabled = body.trace_enabled
+        env_updates["KORE_CLI__TRACE_ENABLED"] = "true" if body.trace_enabled else "false"
+        logger.info("Updated CLI trace mode: %s", body.trace_enabled)
+
+    if env_updates:
+        update_env_file(env_updates)
+
+    return CLIConfigResponse(trace_enabled=config.cli.trace_enabled)

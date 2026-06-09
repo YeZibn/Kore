@@ -52,6 +52,12 @@ class ServerConfig(BaseModel):
     cors_origins: list[str] = ["*"]
 
 
+class CLIConfig(BaseModel):
+    """User-facing CLI preferences."""
+
+    trace_enabled: bool = False
+
+
 class KoreConfig(BaseSettings):
     """Root configuration for Kore."""
 
@@ -61,6 +67,7 @@ class KoreConfig(BaseSettings):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     llm: LLMProviderConfig = Field(default_factory=LLMProviderConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
+    cli: CLIConfig = Field(default_factory=CLIConfig)
     system_prompt: str = (
         "你是 Kore，一个强大的个人 AI 助手。你可以帮助用户完成各种任务，"
         "包括信息搜索、文件操作、代码编写、数据分析等。"

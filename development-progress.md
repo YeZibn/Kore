@@ -732,6 +732,28 @@ LLM 生成 Plan [Step1, Step2, Step3]
   - 已通过 `/opt/miniconda3/envs/agent/bin/python -m compileall backend/kore`
   - 已通过 FastAPI TestClient 注入 fake agent 验证 `/api/chat/stream` 返回 SSE 事件序列和最终 `run_completed.reply`
 
+### 2026-06-09: LLM / Channel interfaces — DeepSeek reasoning 与 Trace 持久化
+
+- 对应 spec: `specs/llm-system.md`、`specs/react-loop.md`、`specs/channel-interfaces.md`
+- 完成内容:
+  - 在统一 `ChatResponse` 中新增 `reasoning_content`
+  - OpenAI-compatible provider 读取 DeepSeek 返回的 `reasoning_content`
+  - ReAct loop 在 provider 返回 reasoning 时发送 `llm_reasoning` trace 事件
+  - CLI trace 增加 reasoning Rich 面板展示 provider、模型、字符数和摘要
+  - 新增 `KoreConfig.cli.trace_enabled`
+  - 新增 `GET /api/config/cli` 与 `PUT /api/config/cli`
+  - `/trace on`、`/trace off` 改为持久化用户配置，写回 `KORE_CLI__TRACE_ENABLED`
+  - CLI welcome runtime 区域和 `/status` 展示当前 trace 开关状态
+- 关键决策:
+  - 用户通过 CLI 修改的配置应持久化，trace 不再是仅当前进程有效的临时开关
+  - DeepSeek `reasoning_content` 作为 provider 返回的可见 reasoning 信号接入，不把它泛化为所有模型的统一内部思维链
+  - 第一版展示 reasoning 摘要，不做长期 trace 存储
+- 验证情况:
+  - 已通过 `/opt/miniconda3/envs/agent/bin/python -m compileall backend/kore`
+  - 已通过 FastAPI TestClient 验证 `/api/config/cli` 读写和 `KORE_CLI__TRACE_ENABLED` 写回 key
+  - 已验证 CLI `llm_reasoning` 面板渲染
+  - 已通过 fake LLM 验证 `AgentCore.run_with_events()` 会发出 `llm_reasoning`
+
 ---
 
 ## 参考资料

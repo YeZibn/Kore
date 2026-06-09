@@ -19,6 +19,9 @@
 - 后端重启时应从 `.env` 恢复上次选择的 chat model
 - DeepSeek 的“思考 / 非思考”通过独立 `thinking` 开关控制，不通过旧模型名区分
 - `thinking` 当前通过 provider 配置接入，并在调用层通过 `extra_body` 透传
+- 不同模型/provider 的思考输出字段不同，需要在 provider 层做适配，向 runtime 暴露统一的 `reasoning_content`
+- DeepSeek thinking 开启时，API 会在 message 上返回 `reasoning_content`；Kore 需要读取该字段并交给 ReAct trace 使用
+- `reasoning_content` 是 provider 返回的可见 reasoning 信号，不等同于所有模型的隐藏 chain-of-thought
 - 其他 provider 的 reasoning / thinking 能力后续应做能力映射，不直接假设所有主流模型都支持同一参数
 
 ## 配置管理
@@ -48,3 +51,4 @@ KoreConfig
 - 已完成 DeepSeek 模型展示修正
 - 已完成模型列表过滤与无效模型切换错误提示
 - 已实现模型切换持久化，重启后会从 `.env` 恢复上次选择
+- 已补充 DeepSeek `reasoning_content` 到统一 `ChatResponse` 与 trace 事件

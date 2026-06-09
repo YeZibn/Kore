@@ -257,6 +257,7 @@ def render_welcome(
     base_url: str,
     model: str,
     thinking: str,
+    trace: str,
     workspace_root: str,
     session_id: str,
     available_model_count: int,
@@ -271,9 +272,10 @@ def render_welcome(
     table.add_row("模型", model)
     table.add_row("可用模型", str(available_model_count))
     table.add_row("推理开关", thinking)
+    table.add_row("Trace", trace)
     table.add_row("工作空间", workspace_root)
     table.add_row("Session", session_id[:8])
-    table.add_row("常用命令", "/help  /status  /model  /chat restart  /server restart")
+    table.add_row("常用命令", "/help  /status  /model  /trace on  /server restart")
 
     console.print(Panel(header, border_style="cyan"))
     console.print(Panel(table, title="Kore Runtime", border_style="blue"))
@@ -285,6 +287,7 @@ def render_status(base_url: str) -> None:
     models = request_json("GET", "/api/models/list", base_url=base_url)
     providers = request_json("GET", "/api/models/providers", base_url=base_url)
     workspace = request_json("GET", "/api/config/workspace", base_url=base_url)
+    cli_config = request_json("GET", "/api/config/cli", base_url=base_url)
 
     summary = Table(box=box.SIMPLE, show_header=False, expand=True)
     summary.add_row("后端", base_url)
@@ -293,6 +296,7 @@ def render_status(base_url: str) -> None:
     summary.add_row("当前模型", models.get("current_model", "unknown"))
     summary.add_row("可用模型数", str(len(models.get("models", []))))
     summary.add_row("DeepSeek thinking", get_deepseek_thinking(base_url))
+    summary.add_row("Trace", "on" if cli_config.get("trace_enabled") else "off")
     summary.add_row("工作空间", workspace.get("workspace_root", "unknown"))
     summary.add_row("工作空间有效", "yes" if workspace.get("is_directory") else "no")
     console.print(Panel(summary, title="Kore 状态", border_style="blue"))
@@ -331,6 +335,13 @@ def render_trace_event(event: dict[str, Any]) -> None:
         table.add_row("Tokens", str(event.get("tokens", 0)))
         if event.get("content_preview"):
             table.add_row("输出摘要", str(event.get("content_preview")))
+    elif event_type == "llm_reasoning":
+        title = f"Reasoning Step {event.get('step')}"
+        border_style = "magenta"
+        table.add_row("Provider", str(event.get("provider", "")))
+        table.add_row("模型", str(event.get("model", "")))
+        table.add_row("字符数", str(event.get("reasoning_chars", 0)))
+        table.add_row("摘要", str(event.get("reasoning_preview", "")))
     elif event_type == "tool_call_started":
         title = "Tool Call"
         border_style = "yellow"
@@ -481,13 +492,30 @@ def get_deepseek_thinking(base_url: str) -> str:
     return "on" if thinking else "off"
 
 
-def render_current_welcome(base_url: str, session_id: str) -> None:
+def get_cli_trace(base_url: str) -> bool:
+    data = request_json("GET", "/api/config/cli", base_url=base_url)
+    return bool(data.get("trace_enabled"))
+
+
+def update_cli_trace(base_url: str, enabled: bool) -> bool:
+    data = request_json(
+        "PUT",
+        "/api/config/cli",
+        base_url=base_url,
+        json_body={"trace_enabled": enabled},
+    )
+    return bool(data.get("trace_enabled"))
+
+
+def render_current_welcome(base_url: str, session_id: str, trace_enabled: bool | None = None) -> None:
     models = request_json("GET", "/api/models/list", base_url=base_url)
     workspace = request_json("GET", "/api/config/workspace", base_url=base_url)
+    trace = get_cli_trace(base_url) if trace_enabled is None else trace_enabled
     render_welcome(
         base_url=base_url,
         model=models.get("current_model", "unknown"),
         thinking=get_deepseek_thinking(base_url),
+        trace="on" if trace else "off",
         workspace_root=workspace.get("workspace_root", "unknown"),
         session_id=session_id,
         available_model_count=len(models.get("models", [])),
@@ -504,8 +532,8 @@ def read_repl_input(prompt_session: PromptSession[str] | None) -> str:
 def run_chat_loop(base_url: str) -> None:
     ensure_backend(base_url)
     session_id = str(uuid.uuid4())
-    trace_enabled = False
-    render_current_welcome(base_url, session_id)
+    trace_enabled = get_cli_trace(base_url)
+    render_current_welcome(base_url, session_id, trace_enabled)
     prompt_session: PromptSession[str] | None = None
     if sys.stdin.isatty():
         prompt_session = PromptSession(
@@ -538,7 +566,7 @@ def run_chat_loop(base_url: str) -> None:
                     border_style="green",
                 )
             )
-            render_current_welcome(base_url, session_id)
+            render_current_welcome(base_url, session_id, trace_enabled)
             continue
         if message == "/status":
             render_status(base_url)
@@ -550,12 +578,12 @@ def run_chat_loop(base_url: str) -> None:
             console.print(f"DeepSeek thinking: [bold]{get_deepseek_thinking(base_url)}[/]")
             continue
         if message == "/trace on":
-            trace_enabled = True
-            console.print(Panel("实时执行轨迹：on", title="Trace", border_style="green"))
+            trace_enabled = update_cli_trace(base_url, True)
+            console.print(Panel("实时执行轨迹：on（已持久化）", title="Trace", border_style="green"))
             continue
         if message == "/trace off":
-            trace_enabled = False
-            console.print(Panel("实时执行轨迹：off", title="Trace", border_style="yellow"))
+            trace_enabled = update_cli_trace(base_url, False)
+            console.print(Panel("实时执行轨迹：off（已持久化）", title="Trace", border_style="yellow"))
             continue
         if message == "/workspace":
             try:
@@ -584,7 +612,8 @@ def run_chat_loop(base_url: str) -> None:
             try:
                 restart_backend(base_url)
                 session_id = str(uuid.uuid4())
-                render_current_welcome(base_url, session_id)
+                trace_enabled = get_cli_trace(base_url)
+                render_current_welcome(base_url, session_id, trace_enabled)
             except BackendUnavailable as exc:
                 render_error(str(exc))
             continue

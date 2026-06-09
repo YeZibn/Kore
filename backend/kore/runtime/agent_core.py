@@ -169,6 +169,19 @@ class AgentCore:
                     "content_preview": self._preview(response.content),
                     "tokens": response.usage.total_tokens,
                 })
+                if response.reasoning_content:
+                    await event_sink({
+                        "type": "llm_reasoning",
+                        "run_id": ctx.run_id,
+                        "step": step + 1,
+                        "model": response.model or model,
+                        "provider": self._provider_name(model),
+                        "reasoning_preview": self._preview(
+                            response.reasoning_content,
+                            max_chars=520,
+                        ),
+                        "reasoning_chars": len(response.reasoning_content),
+                    })
 
             # If no tool calls, this is the final reply
             if not response.tool_calls:
@@ -244,3 +257,14 @@ class AgentCore:
         if len(compact) <= max_chars:
             return compact
         return compact[: max_chars - 3] + "..."
+
+    @staticmethod
+    def _provider_name(model: str) -> str:
+        model_lower = model.lower()
+        if "deepseek" in model_lower:
+            return "deepseek"
+        if "qwen" in model_lower:
+            return "qwen"
+        if "gpt" in model_lower or "o1" in model_lower or "o3" in model_lower or "o4" in model_lower:
+            return "openai"
+        return "unknown"

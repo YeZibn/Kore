@@ -31,6 +31,7 @@ class ChatResponse:
 
     content: str
     tool_calls: list[ToolCall] | None = None
+    reasoning_content: str = ""
     usage: TokenUsage = field(default_factory=TokenUsage)
     model: str = ""
     finish_reason: str = ""

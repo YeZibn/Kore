@@ -48,7 +48,7 @@
 - 观察-执行循环设计
 
 当前概况：
-- 已有最小实现，实时 trace 事件流第一版已实现，用于公开展示 LLM step、工具调用、确认请求和 run summary
+- 已有最小实现，实时 trace 事件流第一版已实现，用于公开展示 LLM step、provider 可见 reasoning、工具调用、确认请求和 run summary
 
 ## 4. llm-system.md
 
@@ -65,7 +65,7 @@
 - reasoning / thinking 能力映射
 
 当前概况：
-- 已具备 OpenAI-compatible 抽象、DeepSeek 官方模型展示修正、thinking 配置、可用模型过滤、无效模型切换校验和模型切换持久化
+- 已具备 OpenAI-compatible 抽象、DeepSeek 官方模型展示修正、thinking 配置、DeepSeek reasoning 输出适配、可用模型过滤、无效模型切换校验和模型切换持久化
 
 ## 5. tool-system.md
 
@@ -166,6 +166,7 @@
 - Kore 第一版专属图标方向已确认，当前保留用户原始 JPG；CLI 欢迎区、中文帮助和详细状态已升级
 - REPL 输入层已升级为 prompt_toolkit，提升中文、退格、长文本编辑、历史记录和命令补全体验
 - REPL trace 实时输出第一版已实现，通过 Rich 面板/表格展示公开执行轨迹
+- CLI welcome runtime 区域和 `/status` 展示当前 trace 开关状态，`/trace on/off` 作为用户配置持久化到 `.env`
 - Chat UI 仍未实质开始
 
 ## 11. api-surface.md
@@ -181,7 +182,7 @@
 - 客户端与后端边界
 
 当前概况：
-- 已有最小 REST API，workspace config API、模型切换校验、模型切换持久化、shutdown API 与 chat stream SSE API 已实现
+- 已有最小 REST API，workspace config API、CLI config API、模型切换校验、模型切换持久化、shutdown API 与 chat stream SSE API 已实现
 
 ## 12. safety-and-policy.md
 

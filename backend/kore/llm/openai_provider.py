@@ -54,6 +54,7 @@ class OpenAIProvider(LLMProvider):
         return ChatResponse(
             content=choice.message.content or "",
             tool_calls=tool_calls,
+            reasoning_content=getattr(choice.message, "reasoning_content", None) or "",
             usage=TokenUsage(
                 prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
                 completion_tokens=response.usage.completion_tokens if response.usage else 0,
